@@ -2,7 +2,7 @@
 
 Capstone project ODP Data Analyst Batch 367 (BNI) — Tim **Asek**.
 
-Author: **Muhammad Nevin** dan **Indah Syafhyra**
+Author: **Muhammad Nevin** dan **Indah Syafhyra Nurjanah**
 
 Sistem *agentic AI* untuk membantu proses screening pengajuan kredit retail/UMKM,
 menggabungkan model machine learning (skor kelayakan 5C) dengan beberapa agent
