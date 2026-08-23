@@ -1,6 +1,6 @@
 # Capstone Project — Screening Credit Agentic AI
 
-Capstone project ODP Data Analyst Batch 367 (BNI) — Tim **Asek**.
+Capstone project ODP Data Analyst Batch 367 (BNI) — Tim **eLo**.
 
 Author: **Muhammad Nevin** dan **Indah Syafhyra Nurjanah**
 
