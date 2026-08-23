@@ -1,0 +1,11 @@
+# Extra dependencies for notebooks/ (EDA, model training) — not needed by the
+# Streamlit dashboard (see requirements.txt), so kept out of the deploy.
+joblib==1.5.3
+lightgbm==4.7.0
+matplotlib==3.11.1
+matplotlib-inline==0.2.2
+scikit-learn==1.9.0
+seaborn==0.13.2
+shap==0.52.0
+torch==2.13.0+cpu
+xgboost==3.4.1
