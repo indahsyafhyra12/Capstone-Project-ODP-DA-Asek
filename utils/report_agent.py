@@ -267,18 +267,38 @@ def _sanity_check(decision: str, narrative: str) -> bool:
     return True
 
 
+_last_fallback_reason: str | None = None
+
+
+def get_last_fallback_reason() -> str | None:
+    """Alasan fallback dari panggilan generate_report() TERAKHIR (None kalau
+    generate LLM berhasil, tidak fallback). Dipakai halaman Streamlit utk
+    menampilkan error asli ke user, bukan cuma di log server yang harus
+    dicari manual."""
+    return _last_fallback_reason
+
+
+def _set_fallback_reason(reason: str | None):
+    global _last_fallback_reason
+    _last_fallback_reason = reason
+
+
 def generate_report(row: dict) -> str:
     """Generate 1 paragraf narasi utk 1 nasabah. `row` = dict hasil
     predict_credit_screening() (utils/risk_ml_pipeline.py) digabung dengan
     `company_name`, ATAU 1 baris master_scored.csv (kolom sama persis).
     Fallback ke row['insight'] (rule-based) kalau model gagal dimuat atau
-    narasi LLM gagal guardrail sanity-check."""
+    narasi LLM gagal guardrail sanity-check - cek get_last_fallback_reason()
+    setelah memanggil ini utk tahu alasan persisnya kalau fallback terjadi."""
     fallback = _safe_get(row, "insight", "Insight tidak tersedia.")
+    _set_fallback_reason(None)
 
     try:
         processor, model = _load_model()
     except Exception as e:
-        logger.warning("Report Agent: gagal memuat model (%s) - fallback ke insight rule-based.", e)
+        reason = f"Model gagal dimuat ({type(e).__name__}): {e}"
+        logger.warning("Report Agent: %s - fallback ke insight rule-based.", reason)
+        _set_fallback_reason(reason)
         return fallback
 
     prompt_data = _build_prompt_data(row)
@@ -288,16 +308,23 @@ def generate_report(row: dict) -> str:
     try:
         narrative = _run_generation(processor, model, user_prompt)
     except Exception as e:
-        logger.warning("Report Agent: generate() error (%s) - fallback ke insight rule-based.", e)
+        reason = f"Generate error ({type(e).__name__}): {e}"
+        logger.warning("Report Agent: %s - fallback ke insight rule-based.", reason)
+        _set_fallback_reason(reason)
         return fallback
     elapsed = time.perf_counter() - start
     logger.info("Report Agent: generate_report selesai dalam %.2fs (decision=%s)", elapsed, row.get("decision"))
 
-    if not narrative or not _sanity_check(row.get("decision", ""), narrative):
-        logger.warning(
-            "Report Agent: guardrail gagal (decision=%s) - fallback ke insight rule-based. Narasi ditolak: %r",
-            row.get("decision"), narrative[:200] if narrative else narrative,
-        )
+    if not narrative:
+        reason = "Model mengembalikan narasi kosong"
+        logger.warning("Report Agent: %s - fallback ke insight rule-based.", reason)
+        _set_fallback_reason(reason)
+        return fallback
+
+    if not _sanity_check(row.get("decision", ""), narrative):
+        reason = f"Guardrail menolak narasi (bertentangan dgn decision={row.get('decision')}): {narrative[:300]!r}"
+        logger.warning("Report Agent: %s - fallback ke insight rule-based.", reason)
+        _set_fallback_reason(reason)
         return fallback
 
     return narrative

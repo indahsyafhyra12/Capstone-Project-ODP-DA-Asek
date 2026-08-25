@@ -20,7 +20,7 @@ import streamlit as st
 
 from utils.agent_pipeline import _dukcapil_names, _normalize_name
 from utils.feature_builder import build_features_from_raw, load_raw_tables
-from utils.report_agent import generate_report
+from utils.report_agent import generate_report, get_last_fallback_reason
 from utils.risk_ml_pipeline import predict_credit_screening
 from utils.ui_components import apply_logo
 
@@ -162,6 +162,7 @@ def screen_one_applicant(user_fields: dict, application_id: str) -> dict:
 
     company_name = user_fields.get("company_name", "")
     alasan = generate_report({"company_name": company_name, **result})
+    fallback_reason = get_last_fallback_reason()
 
     return {
         "application_id": application_id,
@@ -175,6 +176,7 @@ def screen_one_applicant(user_fields: dict, application_id: str) -> dict:
         "Jangka Waktu (bulan)": result["jangka_waktu_bulan"],
         "Bunga (% p.a.)": result["bunga_persen"],
         "Alasan": alasan,
+        "_fallback_reason": fallback_reason,
         "_insight": result["insight"],
         "_shap": result["shap_top_factors"],
         "_is_existing_nik": nik in KNOWN_NIKS,
@@ -249,7 +251,7 @@ with tab_csv:
                                     "NIK": row_filled.get("NIK"), "Decision (Eligibility Recommendation)": "ERROR",
                                     "Risk Score / Eligibility Score": None, "Zone": "-", "Jenis Kredit": "-",
                                     "Nominal Disetujui": None, "Jangka Waktu (bulan)": None, "Bunga (% p.a.)": None,
-                                    "Alasan": str(e), "_insight": "", "_shap": [], "_is_existing_nik": False,
+                                    "Alasan": str(e), "_fallback_reason": None, "_insight": "", "_shap": [], "_is_existing_nik": False,
                                 })
                             progress.progress((i + 1) / len(upload_df), text=f"Memproses {i + 1}/{len(upload_df)}...")
                         progress.empty()
@@ -259,14 +261,18 @@ with tab_csv:
         st.divider()
         st.subheader("Hasil Screening Batch")
         results_df = pd.DataFrame(st.session_state["_batch_results"])
-        display_df = results_df.drop(columns=["_insight", "_shap", "_is_existing_nik"])
+        display_df = results_df.drop(columns=["_insight", "_shap", "_is_existing_nik", "_fallback_reason"])
 
         n_error = (display_df["Decision (Eligibility Recommendation)"] == "ERROR").sum()
         n_layak = display_df["Decision (Eligibility Recommendation)"].isin(["Layak", "Layak Bersyarat"]).sum()
-        m1, m2, m3 = st.columns(3)
+        n_llm_fallback = results_df["_fallback_reason"].notna().sum()
+        m1, m2, m3, m4 = st.columns(4)
         m1.metric("Total Diproses", len(display_df))
         m2.metric("Layak / Layak Bersyarat", int(n_layak))
         m3.metric("Gagal Diproses", int(n_error))
+        m4.metric("Alasan Fallback ke Rule-Based", int(n_llm_fallback))
+        if n_llm_fallback:
+            st.caption("Baris dengan \"Alasan Fallback\" berarti narasi LLM gagal dihasilkan untuk baris itu — lihat detail di bawah.")
 
         st.dataframe(display_df, use_container_width=True, hide_index=True)
         st.download_button(
@@ -278,6 +284,8 @@ with tab_csv:
         with st.expander("Detail insight per nasabah"):
             for r in st.session_state["_batch_results"]:
                 st.markdown(f"**{r['application_id']} — {r['company_name']}**: {r['_insight']}")
+                if r.get("_fallback_reason"):
+                    st.caption(f"⚠️ Fallback: {r['_fallback_reason']}")
 
         if st.button("🗑️ Bersihkan hasil batch"):
             del st.session_state["_batch_results"]
@@ -405,6 +413,12 @@ with tab_manual:
         st.subheader("Hasil Screening")
         display_row = {k: v for k, v in result_row.items() if not k.startswith("_") and k != "NIK"}
         st.dataframe(pd.DataFrame([display_row]), hide_index=True, use_container_width=True)
+
+        if result_row["_fallback_reason"]:
+            st.warning(
+                f"⚠️ Kolom \"Alasan\" di atas adalah **fallback** ke insight rule-based — narasi LLM (Gemma) "
+                f"gagal dihasilkan. Alasan teknis: `{result_row['_fallback_reason']}`"
+            )
 
         with st.expander("Insight teknis dari model (sementara, bukan kolom Alasan di atas)"):
             st.write(result_row["_insight"])
