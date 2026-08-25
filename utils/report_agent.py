@@ -9,7 +9,13 @@ menerima hasilnya sebagai konteks terstruktur dan menulis narasi. Kesimpulan
 narasi yang dihasilkan lolos guardrail sanity-check gagal (lihat
 `_sanity_check`), fallback ke `insight` rule-based yang sudah ada.
 
-Model: google/gemma-4-E4B-it, load lokal di GPU (didesain utk Google Colab).
+Model: google/gemma-4-E2B-it, load lokal di GPU (didesain utk Google Colab).
+Dipilih varian E2B (bukan E4B) karena Report Agent murni text-only (tidak
+pernah pakai vision/audio tower bawaan model multimodal ini) - E2B lebih
+kecil (~separuh E4B) dan lebih mudah muat di GPU gratis (T4) tanpa
+quantization. Ganti MODEL_ID kalau butuh kualitas lebih tinggi & GPU-nya
+cukup besar (atau tambahkan load_in_4bit=True di _load_model() kalau mau
+tetap pakai E4B/varian lebih besar di GPU terbatas).
 Pola loading (AutoProcessor + AutoModelForMultimodalLM) mengikuti
 `Resources Pendukung/agentic-llm-odp-bni*.ipynb`, dikonfirmasi sesuai model
 card resmi HuggingFace - dengan 2 koreksi dari notebook eksperimen itu:
@@ -34,7 +40,7 @@ import streamlit as st
 
 logger = logging.getLogger(__name__)
 
-MODEL_ID = "google/gemma-4-E4B-it"
+MODEL_ID = "google/gemma-4-E2B-it"
 GENERATION_TEMPERATURE = 0.4
 MAX_NEW_TOKENS = 400
 
@@ -214,11 +220,22 @@ def _build_prompt_data(row: dict) -> dict:
 @st.cache_resource(show_spinner=False)
 def _load_model():
     import torch
-    from transformers import AutoModelForMultimodalLM, AutoProcessor
+    from transformers import AutoModelForMultimodalLM, AutoProcessor, BitsAndBytesConfig
 
     processor = AutoProcessor.from_pretrained(MODEL_ID)
+    # 4-bit quantization (bitsandbytes) - bahkan varian E2B "effective 2B"
+    # ternyata tetap berat di VRAM mentah (~13GB) karena tower vision+audio
+    # bawaan model multimodal ini tetap dimuat penuh walau tidak dipakai
+    # (Report Agent murni text-only) - diverifikasi OOM di GPU T4 gratis
+    # (14.56GB) tanpa quantization. NF4 mengecilkan footprint ~4x.
+    quant_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.bfloat16,
+        bnb_4bit_use_double_quant=True,
+    )
     model = AutoModelForMultimodalLM.from_pretrained(
-        MODEL_ID, torch_dtype=torch.bfloat16, device_map="auto",
+        MODEL_ID, quantization_config=quant_config, device_map="auto",
     )
     return processor, model
 
