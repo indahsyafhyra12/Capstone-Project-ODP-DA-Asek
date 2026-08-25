@@ -4,9 +4,10 @@ import plotly.express as px
 import streamlit as st
 
 from utils.data_loader import get_filtered_data, load_master_data
-from utils.ui_components import ZONE_COLORS
+from utils.ui_components import ZONE_COLORS, apply_logo
 
 st.set_page_config(page_title="Screening Credit Agentic AI", page_icon="🏦", layout="wide")
+apply_logo()
 
 ZONE_ORDER = ["Hijau", "Kuning", "Merah"]
 DECISION_ORDER = ["Layak", "Layak Bersyarat", "Perlu Review Ulang", "Tidak Layak"]

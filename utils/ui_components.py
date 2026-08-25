@@ -1,5 +1,9 @@
 """Shared rendering helpers so Detail Nasabah and Simulasi look identical."""
+from pathlib import Path
+
 import streamlit as st
+
+LOGO_PATH = Path(__file__).parent.parent / "data" / "img" / "elo_bni_logo_crop.png"
 
 ZONE_COLORS = {"Hijau": "#16a34a", "Kuning": "#d97706", "Merah": "#dc2626"}
 DECISION_ZONE = {
@@ -17,6 +21,11 @@ AGENT_META = {
     "financial": ("💰", "Financial Agent"),
     "cashflow": ("💳", "Cashflow Agent"),
 }
+
+
+def apply_logo():
+    """Show the BNI logo at the top of the sidebar on every page."""
+    st.logo(str(LOGO_PATH), size="large")
 
 
 def zone_color(zone: str) -> str:

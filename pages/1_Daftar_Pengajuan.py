@@ -2,9 +2,10 @@
 import streamlit as st
 
 from utils.data_loader import load_master_data
-from utils.ui_components import DECISION_ZONE, ZONE_COLORS
+from utils.ui_components import DECISION_ZONE, ZONE_COLORS, apply_logo
 
 st.set_page_config(page_title="Daftar Pengajuan", page_icon="📋", layout="wide")
+apply_logo()
 st.title("📋 Daftar Pengajuan")
 
 df = load_master_data()

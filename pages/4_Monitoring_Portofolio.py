@@ -3,9 +3,10 @@ import plotly.express as px
 import streamlit as st
 
 from utils.data_loader import load_master_data
-from utils.ui_components import ZONE_COLORS
+from utils.ui_components import ZONE_COLORS, apply_logo
 
 st.set_page_config(page_title="Monitoring Portofolio", page_icon="📈", layout="wide")
+apply_logo()
 st.title("📈 Monitoring Portofolio")
 
 df = load_master_data()

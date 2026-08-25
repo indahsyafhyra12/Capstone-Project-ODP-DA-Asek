@@ -3,9 +3,10 @@ import streamlit as st
 
 from utils.agent_pipeline import score_application
 from utils.data_loader import load_master_data
-from utils.ui_components import render_full_result
+from utils.ui_components import apply_logo, render_full_result
 
 st.set_page_config(page_title="Detail Nasabah", page_icon="🔍", layout="wide")
+apply_logo()
 st.title("🔍 Detail Nasabah")
 
 df = load_master_data()
