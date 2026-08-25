@@ -86,9 +86,9 @@ def render_risk_card(risk: dict):
 def render_full_result(result: dict):
     """Render the 6 agent cards (3x2 grid) + the big risk card, given the
     dict returned by agent_pipeline.score_application()."""
-    keys = ["identity", "credit_history", "dhn", "collateral", "financial", "cashflow"]
-    
     render_risk_card(result["risk"])
+    
+    keys = ["identity", "credit_history", "dhn", "collateral", "financial", "cashflow"]
     row1 = st.columns(3)
     for col, key in zip(row1, keys[:3]):
         with col:
