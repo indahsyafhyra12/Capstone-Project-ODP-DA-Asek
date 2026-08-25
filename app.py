@@ -29,7 +29,7 @@ def format_rupiah_compact(value: float) -> str:
     return f"Rp {value:,.0f}".replace(",", ".")
 
 
-st.title("🏦 Screening Credit Agentic AI — Overview")
+st.title("🏦 Screening Credit Agentic AI eLO")
 st.caption("Sistem multi-agent untuk screening awal kelayakan kredit UMKM (prinsip 5C) — hasil scoring dihitung live oleh 7-agent pipeline setiap data dimuat.")
 
 df = load_master_data()
