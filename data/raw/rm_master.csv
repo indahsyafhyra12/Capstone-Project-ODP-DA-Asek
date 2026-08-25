@@ -1,0 +1,41 @@
+rm_id,rm_name,branch_name,region,jabatan,level,join_date
+RM0001,Ani Tanjung,KCP Tebet,Region 1,Relationship Banking Officer,Junior RB,2017-11-02
+RM0002,Krisna Permana,KCP Tebet,Region 1,Relationship Banking Officer,Senior RB,2016-10-14
+RM0003,Dedi Kurniawan,KCP Tebet,Region 1,Relationship Banking Officer,Senior RB,2018-09-19
+RM0004,Rita Halim,KCP Tebet,Region 1,Relationship Banking Officer,Junior RB,2025-07-02
+RM0005,Bayu Situmorang,KCP Kelapa Gading,Region 2,Relationship Banking Officer,Senior RB,2025-03-11
+RM0006,Budi Suryadi,KCP Kelapa Gading,Region 2,Relationship Banking Officer,Senior RB,2023-10-09
+RM0007,Wati Lubis,KCP Kelapa Gading,Region 2,Relationship Banking Officer,Junior RB,2017-03-03
+RM0008,Retno Kusuma,KCP Kelapa Gading,Region 2,Relationship Banking Officer,Junior RB,2015-12-17
+RM0009,Yuni Pratama,KCP Bekasi Barat,Region 3,Relationship Banking Officer,Senior RB,2018-04-25
+RM0010,Indah Rahman,KCP Bekasi Barat,Region 3,Relationship Banking Officer,Senior RB,2022-07-08
+RM0011,Indah Firmansyah,KCP Bekasi Barat,Region 3,Relationship Banking Officer,Senior RB,2016-08-11
+RM0012,Ika Tanjung,KCP Bekasi Barat,Region 3,Relationship Banking Officer,Junior RB,2018-03-02
+RM0013,Krisna Permana,KCP Depok Margonda,Region 3,Relationship Banking Officer,Junior RB,2022-02-09
+RM0014,Ani Nugroho,KCP Depok Margonda,Region 3,Relationship Banking Officer,Junior RB,2025-01-13
+RM0015,Desi Wijaya,KCP Depok Margonda,Region 3,Relationship Banking Officer,Junior RB,2024-12-15
+RM0016,Suryani Setiawan,KCP Depok Margonda,Region 3,Relationship Banking Officer,Junior RB,2024-10-31
+RM0017,Sutrisno Suryadi,KCP Bogor Baranangsiang,Region 4,Relationship Banking Officer,Senior RB,2018-01-19
+RM0018,Slamet Situmorang,KCP Bogor Baranangsiang,Region 4,Relationship Banking Officer,Senior RB,2018-07-31
+RM0019,Maya Lubis,KCP Bogor Baranangsiang,Region 4,Relationship Banking Officer,Senior RB,2022-10-01
+RM0020,Indah Kusuma,KCP Bogor Baranangsiang,Region 4,Relationship Banking Officer,Junior RB,2017-04-09
+RM0021,Slamet Situmorang,KCP Tangerang BSD,Region 4,Relationship Banking Officer,Junior RB,2023-01-05
+RM0022,Sari Setiawan,KCP Tangerang BSD,Region 4,Relationship Banking Officer,Junior RB,2025-12-12
+RM0023,Anton Saputra,KCP Tangerang BSD,Region 4,Relationship Banking Officer,Junior RB,2020-03-30
+RM0024,Rita Tanjung,KCP Tangerang BSD,Region 4,Relationship Banking Officer,Junior RB,2016-04-19
+RM0025,Wahyu Susanto,KCP Cikini,Region 1,Relationship Banking Officer,Junior RB,2021-09-18
+RM0026,Agus Santoso,KCP Cikini,Region 1,Relationship Banking Officer,Senior RB,2015-06-13
+RM0027,Sari Setiawan,KCP Cikini,Region 1,Relationship Banking Officer,Senior RB,2024-05-05
+RM0028,Agus Firmansyah,KCP Cikini,Region 1,Relationship Banking Officer,Junior RB,2022-09-17
+RM0029,Bayu Lubis,KCP Kemang,Region 1,Relationship Banking Officer,Junior RB,2017-07-12
+RM0030,Doni Simanjuntak,KCP Kemang,Region 1,Relationship Banking Officer,Junior RB,2019-08-25
+RM0031,Yanti Suryadi,KCP Kemang,Region 1,Relationship Banking Officer,Junior RB,2017-01-04
+RM0032,Tri Permana,KCP Kemang,Region 1,Relationship Banking Officer,Senior RB,2021-07-14
+RM0033,Yudi Rahman,KCP Pluit,Region 2,Relationship Banking Officer,Senior RB,2018-01-03
+RM0034,Iwan Nugroho,KCP Pluit,Region 2,Relationship Banking Officer,Junior RB,2016-05-01
+RM0035,Anton Rahman,KCP Pluit,Region 2,Relationship Banking Officer,Junior RB,2024-04-21
+RM0036,Yanti Susanto,KCP Pluit,Region 2,Relationship Banking Officer,Junior RB,2018-08-02
+RM0037,Andi Situmorang,KCP Cibubur,Region 2,Relationship Banking Officer,Junior RB,2016-02-01
+RM0038,Ani Firmansyah,KCP Cibubur,Region 2,Relationship Banking Officer,Senior RB,2021-08-31
+RM0039,Slamet Hutapea,KCP Cibubur,Region 2,Relationship Banking Officer,Senior RB,2021-10-25
+RM0040,Tri Wibowo,KCP Cibubur,Region 2,Relationship Banking Officer,Junior RB,2018-06-13
