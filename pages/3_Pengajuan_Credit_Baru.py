@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+from utils.agent_pipeline import _dukcapil_names, _normalize_name
 from utils.feature_builder import build_features_from_raw, load_raw_tables
 from utils.risk_ml_pipeline import predict_credit_screening
 from utils.ui_components import apply_logo
@@ -38,8 +39,14 @@ def _load_rm_master():
     return pd.read_csv("data/raw/rm_master.csv")
 
 
+@st.cache_data
+def _load_dukcapil():
+    return pd.read_csv("data/raw/dukcapil.csv", dtype={"NIK": str})
+
+
 profile_full, slik_full, dhn_full, bank_full, fin_full = _load_raw()
 rm_master = _load_rm_master()
+dukcapil_full = _load_dukcapil()
 
 LEGAL_ENTITY_OPTIONS = sorted(profile_full["legal_entity"].unique().tolist())
 EDUCATION_OPTIONS = sorted(profile_full["owner_education"].unique().tolist())
@@ -53,6 +60,7 @@ CERTIFICATE_TYPE_OPTIONS = sorted(profile_full["certificate_type"].unique().toli
 GENDER_OPTIONS = ["L", "P"]
 YA_TIDAK_OPTIONS = ["Ya", "Tidak"]
 
+DUKCAPIL_NIKS = set(dukcapil_full["NIK"])
 KNOWN_NIKS = set(profile_full["NIK"]) | set(slik_full["NIK"]) | set(bank_full["NIK"]) | set(fin_full["NIK"])
 
 # Kolom CSV upload = persis nama kolom retail_customer_profile.csv (boleh
@@ -360,14 +368,17 @@ with tab_manual:
         submitted = st.form_submit_button("Jalankan Screening", type="primary", use_container_width=True)
 
     if submitted:
-        if len(nik.strip()) != 16 or not nik.strip().isdigit():
+        nik_clean = nik.strip()
+        if len(nik_clean) != 16 or not nik_clean.isdigit():
             st.warning("NIK bukan 16 digit angka — akan otomatis ditolak oleh hard-rule identitas (Stage 1), sesuai desain sistem.")
-
-        is_existing_nik = nik.strip() in KNOWN_NIKS
-        if is_existing_nik:
-            st.info(f"NIK `{nik}` berhasil padan dengan sistem — riwayat SLIK, DHN, ATR/BPN, dan rekening/keuangan asli akan dipakai otomatis.")
+        elif nik_clean not in DUKCAPIL_NIKS:
+            st.error(f"NIK `{nik}` TIDAK terdaftar di Dukcapil — akan otomatis ditolak (hard-rule identitas, Stage 1), model ML tidak akan dipanggil.")
+        elif _normalize_name(owner_name) != _normalize_name(_dukcapil_names().get(nik_clean)):
+            st.error(f"Nama `{owner_name}` TIDAK sesuai data Dukcapil untuk NIK `{nik}`.")
+        elif nik_clean in KNOWN_NIKS:
+            st.info(f"NIK `{nik}` terverifikasi Dukcapil dan sudah dikenal sistem — riwayat SLIK/DHN/rekening/keuangan asli akan dipakai otomatis.")
         else:
-            st.info(f"NIK `{nik}` TIDAK ditemukan di sistem — riwayat SLIK/rekening/keuangan akan dipakai default netral (bukan hard-reject).")
+            st.info(f"NIK `{nik}` terverifikasi Dukcapil, tapi belum ada riwayat kredit — diproses sebagai nasabah baru dengan data netral (bukan hard-reject).")
 
         user_fields = {
             "NIK": nik.strip(), "owner_name": owner_name, "owner_age": owner_age, "owner_gender": owner_gender,

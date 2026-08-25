@@ -23,12 +23,45 @@ were designed for this app — see risk_agent() below.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
+
+_DUKCAPIL_PATH = Path(__file__).parent.parent / "data" / "raw" / "dukcapil.csv"
+_dukcapil_niks_cache: set | None = None
+_dukcapil_names_cache: dict | None = None
+
+
+def _dukcapil_niks() -> set:
+    """NIK-NIK yang terdaftar di data Dukcapil (dimuat & di-cache sekali)."""
+    global _dukcapil_niks_cache
+    if _dukcapil_niks_cache is None:
+        try:
+            _dukcapil_niks_cache = set(pd.read_csv(_DUKCAPIL_PATH, dtype={"NIK": str})["NIK"])
+        except FileNotFoundError:
+            _dukcapil_niks_cache = set()
+    return _dukcapil_niks_cache
+
+
+def _dukcapil_names() -> dict:
+    """Mapping NIK -> nama sesuai Dukcapil (dimuat & di-cache sekali)."""
+    global _dukcapil_names_cache
+    if _dukcapil_names_cache is None:
+        try:
+            df = pd.read_csv(_DUKCAPIL_PATH, dtype={"NIK": str})
+            _dukcapil_names_cache = dict(zip(df["NIK"], df["nama"]))
+        except FileNotFoundError:
+            _dukcapil_names_cache = {}
+    return _dukcapil_names_cache
+
+
+def _normalize_name(name) -> str:
+    return " ".join(str(name).strip().split()).lower()
 
 
 def _num(value, default=0.0):
@@ -61,9 +94,16 @@ def score_status(score, good=0.75, ok=0.5, low=0.3):
 MIN_OWNER_AGE, MAX_OWNER_AGE = 21, 65
 
 
-def identity_agent(nik, owner_age):
+def identity_agent(nik, owner_age, owner_name):
     nik_str = str(nik).strip() if nik is not None else ""
-    valid_nik = nik_str.isdigit() and len(nik_str) == 16
+    valid_format = nik_str.isdigit() and len(nik_str) == 16
+    found_in_dukcapil = valid_format and nik_str in _dukcapil_niks()
+
+    name_matches = False
+    dukcapil_name = None
+    if found_in_dukcapil:
+        dukcapil_name = _dukcapil_names().get(nik_str)
+        name_matches = _normalize_name(owner_name) == _normalize_name(dukcapil_name)
 
     age = None
     try:
@@ -74,21 +114,25 @@ def identity_agent(nik, owner_age):
     valid_age = age is not None and MIN_OWNER_AGE <= age <= MAX_OWNER_AGE
 
     notes = []
-    if not valid_nik:
+    if not valid_format:
         notes.append(f"NIK tidak valid (harus 16 digit angka): '{nik_str}'")
+    elif not found_in_dukcapil:
+        notes.append(f"NIK '{nik_str}' tidak ditemukan di data Dukcapil")
+    elif not name_matches:
+        notes.append(f"Nama '{owner_name}' tidak sesuai data Dukcapil untuk NIK ini")
     if not valid_age:
         shown = age if age is not None else "(tidak diisi)"
         notes.append(f"Usia pemohon {shown} di luar rentang layak {MIN_OWNER_AGE}-{MAX_OWNER_AGE} tahun")
-    is_valid = valid_nik and valid_age
+    is_valid = valid_format and found_in_dukcapil and name_matches and valid_age
     if is_valid:
-        notes.append(f"NIK 16 digit valid & usia {age} tahun dalam rentang layak")
+        notes.append(f"NIK 16 digit valid, nama & data Dukcapil sesuai, usia {age} tahun dalam rentang layak")
 
     return {
         "score": 1.0 if is_valid else 0.0,
         "status": "Valid" if is_valid else "Tidak Valid",
         "notes": notes,
         "hard_reject": not is_valid,
-        "reject_reason": "Identitas tidak valid (NIK/usia)" if not is_valid else None,
+        "reject_reason": "Identitas tidak valid (NIK/nama/usia/tidak terdaftar Dukcapil)" if not is_valid else None,
     }
 
 
@@ -358,7 +402,7 @@ def score_application(data) -> dict:
     below via `.get(key)`."""
     get = data.get
 
-    identity = identity_agent(get("NIK"), get("owner_age"))
+    identity = identity_agent(get("NIK"), get("owner_age"), get("owner_name"))
     credit_history = credit_history_agent(
         get("slik_worst_collectability"), get("slik_has_macet"), get("slik_n_banks")
     )

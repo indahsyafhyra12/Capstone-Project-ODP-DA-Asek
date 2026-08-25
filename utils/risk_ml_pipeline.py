@@ -164,7 +164,7 @@ def run_hard_rule_agents(row: dict) -> dict:
     utils.agent_pipeline's pure per-agent functions (raw value in, dict
     with score/status/notes/hard_reject/reject_reason out)."""
     return {
-        "identity": identity_agent(row.get("NIK"), row.get("owner_age")),
+        "identity": identity_agent(row.get("NIK"), row.get("owner_age"), row.get("owner_name")),
         "credit_history": credit_history_agent(
             row.get("slik_worst_collectability"), row.get("slik_has_macet"), row.get("slik_n_banks")
         ),
