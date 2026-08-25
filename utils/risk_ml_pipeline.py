@@ -100,14 +100,36 @@ _BALANCE_RATIO_P90 = 19.2
 _CURRENT_RATIO_P90 = 22.8
 
 
-def _calibrated_cashflow_score(row):
+def _calibrated_cashflow(row):
     turnover = max(_num(row.get("monthly_turnover_est"), 1.0), 1.0)
     balance_ratio = _num(row.get("bank_best_avg_balance_6m"), 0.0) / turnover
     current_ratio = _num(row.get("bank_best_current_balance"), 0.0) / turnover
     base = 0.5 * np.clip(balance_ratio / _BALANCE_RATIO_P90, 0, 1) + 0.5 * np.clip(current_ratio / _CURRENT_RATIO_P90, 0, 1)
-    overdraft_penalty = min(_num(row.get("bank_total_overdraft_6m"), 0) * 0.1, 0.3)
-    dormant_penalty = 0.15 if _num(row.get("bank_any_dormant"), 0) == 1 else 0.0
-    return round(float(np.clip(base - overdraft_penalty - dormant_penalty, 0, 1)), 3)
+    overdraft_count = int(_num(row.get("bank_total_overdraft_6m"), 0))
+    overdraft_penalty = min(overdraft_count * 0.1, 0.3)
+    is_dormant = _num(row.get("bank_any_dormant"), 0) == 1
+    score = round(float(np.clip(base - overdraft_penalty - (0.15 if is_dormant else 0.0), 0, 1)), 3)
+
+    notes = f"Saldo rata-rata {balance_ratio:.1f}x omset bulanan, saldo real-time {current_ratio:.1f}x omset bulanan"
+    if overdraft_count > 0:
+        notes += f", overdraft {overdraft_count}x dalam 6 bulan"
+    if is_dormant:
+        notes += ", memiliki rekening dormant"
+    return {"score": score, "notes": notes}
+
+
+_INSIGHT_KATEGORI_PREFIXES = [
+    "Layak bersyarat karena", "Perlu review ulang karena", "Layak tapi",
+    "Layak karena", "Tidak layak tapi", "Tidak layak karena",
+]
+
+
+def _kategori_insight(insight: str) -> str:
+    lowered = insight.lower()
+    for prefix in _INSIGHT_KATEGORI_PREFIXES:
+        if lowered.startswith(prefix.lower()):
+            return prefix
+    return "Lainnya"
 
 
 def _compose_insight(decision, scores, score, hard_rule_reason=None):
@@ -154,6 +176,11 @@ def _hard_reject_result(insight):
         "risk_score": None, "decision": "Tidak Layak", "zone": "Merah",
         "jenis_kredit_rekomendasi": "-", "nominal_disetujui": 0,
         "jangka_waktu_bulan": 0, "bunga_persen": None, "insight": insight,
+        "insight_kategori": _kategori_insight(insight),
+        "character_score": None, "character_notes": None,
+        "financial_score": None, "financial_notes": None,
+        "collateral_score": None, "collateral_notes": None,
+        "cashflow_score": None, "cashflow_notes": None,
         "shap_top_factors": [],
     }
 
@@ -221,14 +248,17 @@ def predict_credit_screening(row_raw_features: dict) -> dict:
     tenor = TENOR_BY_LOAN.get(jenis, 24) if decision != "Tidak Layak" else 0
     bunga = INTEREST_BY_ZONE[zone] if decision != "Tidak Layak" else None
 
-    # Sub-scores purely for the insight narrative (NOT fed into the ML model)
+    # Sub-scores/notes purely for the insight narrative (NOT fed into the ML model)
+    character = hard["credit_history"]
+    financial = financial_agent(row.get("revenue_growth_pct"), row.get("profit_margin_2025"))
+    collateral = collateral_agent(row.get("collateral_ratio"), row.get("ownership_match"))
+    cashflow = _calibrated_cashflow(row)
     scores = {
-        "Character": hard["credit_history"]["score"],
-        "Financial": financial_agent(row.get("revenue_growth_pct"), row.get("profit_margin_2025"))["score"],
-        "Collateral": collateral_agent(row.get("collateral_ratio"), row.get("ownership_match"))["score"],
-        "Cashflow": _calibrated_cashflow_score(row),
+        "Character": character["score"], "Financial": financial["score"],
+        "Collateral": collateral["score"], "Cashflow": cashflow["score"],
     }
     insight = _compose_insight(decision, scores, risk_score)
+    insight_kategori = _kategori_insight(insight)
 
     # SHAP top factors, for extra transparency on top of the rule-style insight
     top_factors = []
@@ -255,5 +285,10 @@ def predict_credit_screening(row_raw_features: dict) -> dict:
         "jangka_waktu_bulan": tenor,
         "bunga_persen": bunga,
         "insight": insight,
+        "insight_kategori": insight_kategori,
+        "character_score": character["score"], "character_notes": "; ".join(character["notes"]),
+        "financial_score": financial["score"], "financial_notes": "; ".join(financial["notes"]),
+        "collateral_score": collateral["score"], "collateral_notes": "; ".join(collateral["notes"]),
+        "cashflow_score": cashflow["score"], "cashflow_notes": cashflow["notes"],
         "shap_top_factors": top_factors,
     }

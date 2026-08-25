@@ -20,6 +20,7 @@ import streamlit as st
 
 from utils.agent_pipeline import _dukcapil_names, _normalize_name
 from utils.feature_builder import build_features_from_raw, load_raw_tables
+from utils.report_agent import generate_report
 from utils.risk_ml_pipeline import predict_credit_screening
 from utils.ui_components import apply_logo
 
@@ -159,9 +160,12 @@ def screen_one_applicant(user_fields: dict, application_id: str) -> dict:
     features = build_features_from_raw([application_id], new_profile_row, slik_full, dhn_full, bank_full, fin_full)
     result = predict_credit_screening(features.iloc[0].to_dict())
 
+    company_name = user_fields.get("company_name", "")
+    alasan = generate_report({"company_name": company_name, **result})
+
     return {
         "application_id": application_id,
-        "company_name": user_fields.get("company_name", ""),
+        "company_name": company_name,
         "NIK": nik,
         "Decision (Eligibility Recommendation)": result["decision"],
         "Risk Score / Eligibility Score": result["risk_score"],
@@ -170,7 +174,7 @@ def screen_one_applicant(user_fields: dict, application_id: str) -> dict:
         "Nominal Disetujui": result["nominal_disetujui"],
         "Jangka Waktu (bulan)": result["jangka_waktu_bulan"],
         "Bunga (% p.a.)": result["bunga_persen"],
-        "Alasan": "",
+        "Alasan": alasan,
         "_insight": result["insight"],
         "_shap": result["shap_top_factors"],
         "_is_existing_nik": nik in KNOWN_NIKS,
@@ -394,7 +398,8 @@ with tab_manual:
             "collateral_location": collateral_location, "collateral_province": collateral_province, "collateral_city": collateral_city,
         }
         application_id = f"SIM{datetime.now().strftime('%Y%m%d%H%M%S')}"
-        result_row = screen_one_applicant(user_fields, application_id)
+        with st.spinner("Menyusun analisis..."):
+            result_row = screen_one_applicant(user_fields, application_id)
 
         st.divider()
         st.subheader("Hasil Screening")
