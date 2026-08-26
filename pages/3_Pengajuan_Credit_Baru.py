@@ -21,7 +21,7 @@ import streamlit as st
 from utils.agent_pipeline import _dukcapil_names, _normalize_name
 from utils.feature_builder import build_features_from_raw, load_raw_tables
 from utils.report_agent import generate_report, get_last_fallback_reason
-from utils.risk_ml_pipeline import predict_credit_screening
+from utils.risk_ml_pipeline import apply_policy_engine, predict_credit_screening
 from utils.ui_components import apply_logo
 
 st.set_page_config(page_title="Pengajuan Credit Baru", page_icon="🧪", layout="wide")
@@ -192,6 +192,8 @@ def run_ml_screening(user_fields: dict, application_id: str) -> dict:
         "_is_existing_nik": nik in KNOWN_NIKS,
         "_result": result,
         "_manual_override": False,
+        "_loan_requested": loan_requested,
+        "_collateral_market_value": collateral_market_value,
     }
 
 
@@ -204,6 +206,41 @@ def run_llm_narrative(row: dict) -> dict:
     row["Alasan"] = generate_report({"company_name": row["company_name"], **row["_result"]})
     row["_fallback_reason"] = get_last_fallback_reason()
     return row
+
+
+DERIVED_FROM_RISK_SCORE = [
+    "Decision (Eligibility Recommendation)", "Zone", "Jenis Kredit",
+    "Nominal Disetujui", "Jangka Waktu (bulan)", "Bunga (% p.a.)",
+]
+_POLICY_FIELD_MAP = {
+    "Decision (Eligibility Recommendation)": "decision", "Zone": "zone",
+    "Jenis Kredit": "jenis_kredit_rekomendasi", "Nominal Disetujui": "nominal_disetujui",
+    "Jangka Waktu (bulan)": "jangka_waktu_bulan", "Bunga (% p.a.)": "bunga_persen",
+}
+
+
+def _cascade_edit(new_vals: dict, orig: dict) -> dict:
+    """Kalau Risk Score diedit tapi field turunannya (decision/zone/jenis
+    kredit/nominal/tenor/bunga) TIDAK ikut disentuh user di edit yang sama,
+    hitung ulang otomatis pakai apply_policy_engine() - policy engine yang
+    sama dengan yang dipakai predict_credit_screening() - supaya field2 itu
+    tidak nyangkut di nilai lama yang sudah tidak konsisten dengan risk_score
+    baru. Field yang memang sengaja diedit manual oleh user tetap dihormati,
+    tidak ditimpa cascade."""
+    new_vals = dict(new_vals)
+    score_changed = new_vals["Risk Score / Eligibility Score"] != orig.get("Risk Score / Eligibility Score")
+    if not score_changed:
+        return new_vals
+    untouched = [c for c in DERIVED_FROM_RISK_SCORE if new_vals[c] == orig.get(c)]
+    if not untouched:
+        return new_vals
+    cascaded = apply_policy_engine(
+        new_vals["Risk Score / Eligibility Score"],
+        orig.get("_loan_requested", 0), orig.get("_collateral_market_value", 0),
+    )
+    for c in untouched:
+        new_vals[c] = cascaded[_POLICY_FIELD_MAP[c]]
+    return new_vals
 
 
 def _prefill_form_from_row(row: dict):
@@ -286,7 +323,8 @@ with tab_csv:
         st.divider()
         st.subheader("Hasil Screening Batch (ML)")
         results_df = pd.DataFrame(st.session_state["_batch_results"])
-        display_df = results_df.drop(columns=["_insight", "_shap", "_is_existing_nik", "_fallback_reason", "_result", "_manual_override"])
+        internal_cols = [c for c in results_df.columns if c.startswith("_")]
+        display_df = results_df.drop(columns=internal_cols)
 
         n_error = (display_df["Decision (Eligibility Recommendation)"] == "ERROR").sum()
         n_layak = display_df["Decision (Eligibility Recommendation)"].isin(["Layak", "Layak Bersyarat"]).sum()
@@ -331,12 +369,14 @@ with tab_csv:
                     orig = updated[i]
                     if orig.get("_result") is None:
                         continue  # baris ERROR - tidak punya hasil AI, tidak bisa dioverride
-                    changed = any(row[c] != orig.get(c) for c in MANUAL_EDIT_FIELDS)
+                    proposed = {c: row[c] for c in MANUAL_EDIT_FIELDS}
+                    changed = any(proposed[c] != orig.get(c) for c in MANUAL_EDIT_FIELDS)
                     if changed:
                         if not orig.get("_manual_override"):
                             orig["_ai_original"] = {c: orig.get(c) for c in MANUAL_EDIT_FIELDS}
+                        proposed = _cascade_edit(proposed, orig)
                         for c in MANUAL_EDIT_FIELDS:
-                            orig[c] = row[c]
+                            orig[c] = proposed[c]
                         orig["_manual_override"] = True
                     updated[i] = orig
                 st.session_state["_batch_results"] = updated
@@ -561,16 +601,20 @@ with tab_manual:
                 if st.button("💾 Simpan Perubahan Manual", type="primary", use_container_width=True):
                     if not result_row.get("_manual_override"):
                         result_row["_ai_original"] = {c: result_row[c] for c in MANUAL_EDIT_FIELDS}
-                    result_row["Decision (Eligibility Recommendation)"] = edit_decision
-                    result_row["Zone"] = edit_zone
-                    result_row["Risk Score / Eligibility Score"] = edit_risk_score
-                    result_row["Jenis Kredit"] = edit_jenis
-                    result_row["Nominal Disetujui"] = edit_nominal
-                    result_row["Jangka Waktu (bulan)"] = edit_tenor
-                    result_row["Bunga (% p.a.)"] = edit_bunga
+                    proposed = {
+                        "Decision (Eligibility Recommendation)": edit_decision, "Zone": edit_zone,
+                        "Risk Score / Eligibility Score": edit_risk_score, "Jenis Kredit": edit_jenis,
+                        "Nominal Disetujui": edit_nominal, "Jangka Waktu (bulan)": edit_tenor,
+                        "Bunga (% p.a.)": edit_bunga,
+                    }
+                    proposed = _cascade_edit(proposed, result_row)
+                    for c in MANUAL_EDIT_FIELDS:
+                        result_row[c] = proposed[c]
                     result_row["_manual_override"] = True
                     st.session_state["_manual_result"] = result_row
-                    st.success("Perubahan manual disimpan.")
+                    for k in ("_edit_decision", "_edit_zone", "_edit_risk_score", "_edit_jenis", "_edit_nominal", "_edit_tenor", "_edit_bunga"):
+                        st.session_state.pop(k, None)
+                    st.success("Perubahan manual disimpan (field turunan risk_score ikut disesuaikan otomatis).")
                     st.rerun()
             with bcol2:
                 if result_row.get("_manual_override") and st.button("↩️ Kembalikan ke Rekomendasi AI", use_container_width=True):

@@ -171,6 +171,30 @@ def _score_to_decision_zone(score):
     return "Tidak Layak", "Merah"
 
 
+def apply_policy_engine(risk_score, loan_requested, collateral_market_value) -> dict:
+    """STAGE 3 - decision/zone/jenis/nominal/tenor/bunga, as a pure function of
+    risk_score + the 2 loan-sizing inputs. Factored out of
+    predict_credit_screening() so a loan officer's manual risk_score override
+    (pages/3_Pengajuan_Credit_Baru.py) can cascade through the exact same
+    rules instead of leaving the other fields stuck at stale AI-derived
+    values next to an edited score."""
+    decision, zone = _score_to_decision_zone(risk_score)
+
+    loan_requested = _num(loan_requested, 0)
+    collateral_market_value = _num(collateral_market_value, 0)
+    max_by_collateral = collateral_market_value * 0.7
+    nominal = int(min(loan_requested, max_by_collateral)) if decision != "Tidak Layak" else 0
+    jenis = "KMK" if loan_requested < 200_000_000 else "KI"
+    jenis = jenis if decision != "Tidak Layak" else "-"
+    tenor = TENOR_BY_LOAN.get(jenis, 24) if decision != "Tidak Layak" else 0
+    bunga = INTEREST_BY_ZONE[zone] if decision != "Tidak Layak" else None
+
+    return {
+        "decision": decision, "zone": zone, "jenis_kredit_rekomendasi": jenis,
+        "nominal_disetujui": nominal, "jangka_waktu_bulan": tenor, "bunga_persen": bunga,
+    }
+
+
 def _hard_reject_result(insight):
     return {
         "risk_score": None, "decision": "Tidak Layak", "zone": "Merah",
@@ -238,15 +262,10 @@ def predict_credit_screening(row_raw_features: dict) -> dict:
     risk_score = float(np.clip(model.predict(X_proc)[0], 0, 1))
 
     # === STAGE 3: post-ML policy engine (rule-based, unchanged) ==============
-    decision, zone = _score_to_decision_zone(risk_score)
-
-    loan_requested = _num(row.get("loan_requested"), 0)
-    collateral_market_value = _num(row.get("collateral_market_value"), 0)
-    max_by_collateral = collateral_market_value * 0.7
-    nominal = int(min(loan_requested, max_by_collateral)) if decision != "Tidak Layak" else 0
-    jenis = "KMK" if loan_requested < 200_000_000 else "KI"
-    tenor = TENOR_BY_LOAN.get(jenis, 24) if decision != "Tidak Layak" else 0
-    bunga = INTEREST_BY_ZONE[zone] if decision != "Tidak Layak" else None
+    policy = apply_policy_engine(risk_score, row.get("loan_requested"), row.get("collateral_market_value"))
+    decision, zone = policy["decision"], policy["zone"]
+    nominal, jenis = policy["nominal_disetujui"], policy["jenis_kredit_rekomendasi"]
+    tenor, bunga = policy["jangka_waktu_bulan"], policy["bunga_persen"]
 
     # Sub-scores/notes purely for the insight narrative (NOT fed into the ML model)
     character = hard["credit_history"]
@@ -280,7 +299,7 @@ def predict_credit_screening(row_raw_features: dict) -> dict:
         "risk_score": round(risk_score, 3),
         "decision": decision,
         "zone": zone,
-        "jenis_kredit_rekomendasi": jenis if decision != "Tidak Layak" else "-",
+        "jenis_kredit_rekomendasi": jenis,
         "nominal_disetujui": nominal,
         "jangka_waktu_bulan": tenor,
         "bunga_persen": bunga,
