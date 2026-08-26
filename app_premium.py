@@ -163,7 +163,7 @@ pages = [
     ),
 
     st.Page(
-        monitoring_page,
+        "pages_v2/04_Monitoring_Portofolio_Premium.py",
         title="Monitoring Portofolio",
         icon="📊",
     ),
