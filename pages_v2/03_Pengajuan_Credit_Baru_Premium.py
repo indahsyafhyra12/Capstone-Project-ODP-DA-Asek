@@ -1,4 +1,9 @@
-"""Screening Pengajuan Credit Baru — predict screening lewat pipeline hybrid ML.
+"""Screening Pengajuan Credit Baru (Premium UI) — predict screening lewat pipeline hybrid ML.
+
+Fungsionalitas identik dengan pages/3_Pengajuan_Credit_Baru.py, dibungkus
+tampilan premium (hero banner, section-title styling) utk dipakai lewat
+app_premium.py + pages_v2. Kalau ada perubahan fungsional, terapkan di kedua
+file supaya tidak drift.
 
 Dua cara input:
   1. Manual (1 nasabah) — form lengkap.
@@ -11,6 +16,14 @@ DHN/rekening/keuangan ditelusuri otomatis lewat NIK dari data/raw/*.csv
 (build_features_from_raw) — kalau NIK sudah ada di sistem, riwayat asli
 dipakai; kalau NIK baru, dipakai default netral (bukan hard-reject),
 konsisten dengan notebooks/04_deploy_predict_ml_risk_scoring.ipynb.
+
+Screening ML (risk_score/decision/dst.) dan narasi LLM sengaja dipisah jadi
+2 tombol - ML instan, narasi LLM opsional & dipicu terpisah supaya loan
+officer tidak perlu menunggu LLM cuma utk lihat risk_score. Field turunan
+risk_score (decision/zone/bunga/nominal/tenor/jenis kredit) bisa dioverride
+manual lewat apply_policy_engine() (utils/risk_ml_pipeline.py) - kalau cuma
+Credit Eligibility Score yang diedit, field turunannya ikut di-cascade
+otomatis pakai policy engine yang sama dengan AI.
 """
 from datetime import datetime
 
@@ -21,7 +34,7 @@ import streamlit as st
 from utils.agent_pipeline import _dukcapil_names, _normalize_name
 from utils.feature_builder import build_features_from_raw, load_raw_tables
 from utils.report_agent import generate_report, get_last_fallback_reason
-from utils.risk_ml_pipeline import predict_credit_screening
+from utils.risk_ml_pipeline import apply_policy_engine, predict_credit_screening
 from utils.ui_components import apply_logo
 from utils.ui_premium import inject_css, hero_banner
 
@@ -43,10 +56,9 @@ hero_banner(
     "Credit Eligibility AI • Screening UMKM menggunakan ML Pipeline (risk_ml_pipeline)."
 )
 
-c1,c2=st.columns([3,1])
+c1, c2 = st.columns([3, 1])
 with c2:
     st.success("🤖 ML Pipeline Active")
-
 
 
 @st.cache_data
@@ -79,6 +91,17 @@ COLLATERAL_TYPE_OPTIONS = sorted(profile_full["collateral_type"].unique().tolist
 CERTIFICATE_TYPE_OPTIONS = sorted(profile_full["certificate_type"].unique().tolist())
 GENDER_OPTIONS = ["L", "P"]
 YA_TIDAK_OPTIONS = ["Ya", "Tidak"]
+
+# Opsi utk override manual hasil screening AI (lihat run_ml_screening() /
+# utils/risk_ml_pipeline.py) - dipakai kalau RM tidak setuju dgn rekomendasi
+# model dan mau menyesuaikan sendiri sebelum hasil dianggap final.
+DECISION_OPTIONS = ["Layak", "Layak Bersyarat", "Perlu Review Ulang", "Tidak Layak"]
+ZONE_OPTIONS = ["Hijau", "Kuning", "Merah"]
+JENIS_KREDIT_OPTIONS = ["KMK", "KI", "KPR", "KKB", "KK", "-"]
+MANUAL_EDIT_FIELDS = [
+    "Decision (Eligibility Recommendation)", "Credit Eligibility Score", "Zone",
+    "Jenis Kredit", "Nominal Disetujui", "Jangka Waktu (bulan)", "Bunga (% p.a.)",
+]
 
 DUKCAPIL_NIKS = set(dukcapil_full["NIK"])
 KNOWN_NIKS = set(profile_full["NIK"]) | set(slik_full["NIK"]) | set(bank_full["NIK"]) | set(fin_full["NIK"])
@@ -147,10 +170,12 @@ def _build_csv_template() -> bytes:
     return template_df.to_csv(index=False).encode("utf-8")
 
 
-def screen_one_applicant(user_fields: dict, application_id: str) -> dict:
-    """Satu implementasi dipakai baik utk submit form manual maupun tiap
-    baris di batch CSV - system-fill field non-user, build fitur dari raw
-    tables, jalankan predict_credit_screening()."""
+def run_ml_screening(user_fields: dict, application_id: str) -> dict:
+    """Bagian CEPAT (ML only) - system-fill field non-user, build fitur dari
+    raw tables, jalankan predict_credit_screening(). TIDAK memanggil LLM,
+    jadi risk_score/decision bisa langsung dilihat tanpa menunggu narasi.
+    Narasi "Alasan" diisi lewat run_llm_narrative() secara terpisah, dipicu
+    tombol lain."""
     nik = str(user_fields["NIK"]).strip()
     existing_cif = profile_full.loc[profile_full["NIK"] == nik, "cif_number"]
     cif_number = existing_cif.iloc[0] if len(existing_cif) else f"CIF-SIM-{nik[-6:] if len(nik) >= 6 else nik}"
@@ -180,9 +205,6 @@ def screen_one_applicant(user_fields: dict, application_id: str) -> dict:
     result = predict_credit_screening(features.iloc[0].to_dict())
 
     company_name = user_fields.get("company_name", "")
-    alasan = generate_report({"company_name": company_name, **result})
-    fallback_reason = get_last_fallback_reason()
-
     return {
         "application_id": application_id,
         "company_name": company_name,
@@ -194,12 +216,62 @@ def screen_one_applicant(user_fields: dict, application_id: str) -> dict:
         "Nominal Disetujui": result["nominal_disetujui"],
         "Jangka Waktu (bulan)": result["jangka_waktu_bulan"],
         "Bunga (% p.a.)": result["bunga_persen"],
-        "Alasan": alasan,
-        "_fallback_reason": fallback_reason,
+        "Alasan": None,
+        "_fallback_reason": None,
         "_insight": result["insight"],
         "_shap": result["shap_top_factors"],
         "_is_existing_nik": nik in KNOWN_NIKS,
+        "_result": result,
+        "_manual_override": False,
+        "_loan_requested": loan_requested,
+        "_collateral_market_value": collateral_market_value,
     }
+
+
+def run_llm_narrative(row: dict) -> dict:
+    """Bagian LAMBAT (LLM) - isi kolom "Alasan" dari row hasil
+    run_ml_screening() (butuh key "_result" mentah dari predict_credit_screening).
+    Dipanggil terpisah lewat tombol sendiri supaya risk_score bisa dilihat
+    duluan tanpa menunggu ini."""
+    row = dict(row)
+    row["Alasan"] = generate_report({"company_name": row["company_name"], **row["_result"]})
+    row["_fallback_reason"] = get_last_fallback_reason()
+    return row
+
+
+DERIVED_FROM_RISK_SCORE = [
+    "Decision (Eligibility Recommendation)", "Zone", "Jenis Kredit",
+    "Nominal Disetujui", "Jangka Waktu (bulan)", "Bunga (% p.a.)",
+]
+_POLICY_FIELD_MAP = {
+    "Decision (Eligibility Recommendation)": "decision", "Zone": "zone",
+    "Jenis Kredit": "jenis_kredit_rekomendasi", "Nominal Disetujui": "nominal_disetujui",
+    "Jangka Waktu (bulan)": "jangka_waktu_bulan", "Bunga (% p.a.)": "bunga_persen",
+}
+
+
+def _cascade_edit(new_vals: dict, orig: dict) -> dict:
+    """Kalau Credit Eligibility Score diedit tapi field turunannya
+    (decision/zone/jenis kredit/nominal/tenor/bunga) TIDAK ikut disentuh
+    user di edit yang sama, hitung ulang otomatis pakai apply_policy_engine()
+    - policy engine yang sama dengan yang dipakai predict_credit_screening()
+    - supaya field2 itu tidak nyangkut di nilai lama yang sudah tidak
+    konsisten dengan skor baru. Field yang memang sengaja diedit manual oleh
+    user tetap dihormati, tidak ditimpa cascade."""
+    new_vals = dict(new_vals)
+    score_changed = new_vals["Credit Eligibility Score"] != orig.get("Credit Eligibility Score")
+    if not score_changed:
+        return new_vals
+    untouched = [c for c in DERIVED_FROM_RISK_SCORE if new_vals[c] == orig.get(c)]
+    if not untouched:
+        return new_vals
+    cascaded = apply_policy_engine(
+        new_vals["Credit Eligibility Score"],
+        orig.get("_loan_requested", 0), orig.get("_collateral_market_value", 0),
+    )
+    for c in untouched:
+        new_vals[c] = cascaded[_POLICY_FIELD_MAP[c]]
+    return new_vals
 
 
 def _prefill_form_from_row(row: dict):
@@ -256,14 +328,14 @@ with tab_csv:
                         st.rerun()
                 else:
                     st.info(f"CSV berisi {len(upload_df)} pengajuan — akan diproses langsung sebagai batch (tanpa form individual).")
-                    if st.button(f"🚀 Jalankan Screening untuk {len(upload_df)} Nasabah", type="primary"):
+                    if st.button(f"🤖 Jalankan AI Screening (ML) untuk {len(upload_df)} Nasabah", type="primary"):
                         progress = st.progress(0.0, text="Memproses...")
                         batch_results = []
                         for i, (_, row) in enumerate(upload_df.iterrows()):
                             row_filled = _apply_defaults(row.to_dict())
                             app_id = f"SIM{datetime.now().strftime('%Y%m%d%H%M%S')}{i:03d}"
                             try:
-                                batch_results.append(screen_one_applicant(row_filled, app_id))
+                                batch_results.append(run_ml_screening(row_filled, app_id))
                             except Exception as e:
                                 batch_results.append({
                                     "application_id": app_id, "company_name": row_filled.get("company_name", ""),
@@ -271,43 +343,120 @@ with tab_csv:
                                     "Credit Eligibility Score": None, "Zone": "-", "Jenis Kredit": "-",
                                     "Nominal Disetujui": None, "Jangka Waktu (bulan)": None, "Bunga (% p.a.)": None,
                                     "Alasan": str(e), "_fallback_reason": None, "_insight": "", "_shap": [], "_is_existing_nik": False,
+                                    "_result": None, "_manual_override": False,
                                 })
                             progress.progress((i + 1) / len(upload_df), text=f"Memproses {i + 1}/{len(upload_df)}...")
                         progress.empty()
                         st.session_state["_batch_results"] = batch_results
+                        st.session_state["_batch_edit_version"] = 0
 
     if "_batch_results" in st.session_state:
         st.divider()
-        st.markdown('<div class="section-title">📈 Hasil Batch Screening</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">📈 Hasil Batch Screening (ML)</div>', unsafe_allow_html=True)
         results_df = pd.DataFrame(st.session_state["_batch_results"])
-        display_df = results_df.drop(columns=["_insight", "_shap", "_is_existing_nik", "_fallback_reason"])
+        internal_cols = [c for c in results_df.columns if c.startswith("_")]
+        display_df = results_df.drop(columns=internal_cols)
 
         n_error = (display_df["Decision (Eligibility Recommendation)"] == "ERROR").sum()
         n_layak = display_df["Decision (Eligibility Recommendation)"].isin(["Layak", "Layak Bersyarat"]).sum()
-        n_llm_fallback = results_df["_fallback_reason"].notna().sum()
-        m1, m2, m3, m4 = st.columns(4)
+        belum_narasi_idx = [i for i, r in enumerate(st.session_state["_batch_results"]) if r.get("_result") is not None and not r.get("Alasan")]
+        n_override = sum(1 for r in st.session_state["_batch_results"] if r.get("_manual_override"))
+        m1, m2, m3, m4, m5 = st.columns(5)
         m1.metric("Total Diproses", len(display_df))
         m2.metric("Layak / Layak Bersyarat", int(n_layak))
         m3.metric("Gagal Diproses", int(n_error))
-        m4.metric("Alasan Fallback ke Rule-Based", int(n_llm_fallback))
-        if n_llm_fallback:
-            st.caption("Baris dengan \"Alasan Fallback\" berarti narasi LLM gagal dihasilkan untuk baris itu — lihat detail di bawah.")
+        m4.metric("Belum Ada Narasi LLM", len(belum_narasi_idx))
+        m5.metric("Diedit Manual", int(n_override))
 
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
+        st.caption(
+            "Kolom Decision/Credit Eligibility Score/Zone/Jenis Kredit/Nominal/Tenor/Bunga bisa diedit "
+            "langsung di tabel kalau Anda tidak setuju dengan rekomendasi AI — baris yang diubah otomatis "
+            "ditandai \"Ya\" di kolom Diedit Manual. Klik \"💾 Simpan Perubahan Manual\" untuk menyimpan."
+        )
+        editable_df = display_df.copy()
+        editable_df["Diedit Manual"] = [
+            "Ya" if r.get("_manual_override") else "Tidak" for r in st.session_state["_batch_results"]
+        ]
+        editor_key = f"_batch_editor_{st.session_state.get('_batch_edit_version', 0)}"
+        edited_df = st.data_editor(
+            editable_df, use_container_width=True, hide_index=True, key=editor_key,
+            disabled=[c for c in editable_df.columns if c not in MANUAL_EDIT_FIELDS],
+            column_config={
+                "Decision (Eligibility Recommendation)": st.column_config.SelectboxColumn(options=DECISION_OPTIONS),
+                "Zone": st.column_config.SelectboxColumn(options=ZONE_OPTIONS),
+                "Jenis Kredit": st.column_config.SelectboxColumn(options=JENIS_KREDIT_OPTIONS),
+                "Credit Eligibility Score": st.column_config.NumberColumn(min_value=0.0, max_value=1.0, step=0.01, format="%.3f"),
+                "Nominal Disetujui": st.column_config.NumberColumn(min_value=0, step=1_000_000),
+                "Jangka Waktu (bulan)": st.column_config.NumberColumn(min_value=0, step=1),
+                "Bunga (% p.a.)": st.column_config.NumberColumn(min_value=0.0, step=0.1, format="%.1f"),
+            },
+        )
+
+        ecol1, ecol2, ecol3 = st.columns(3)
+        with ecol1:
+            if st.button("💾 Simpan Perubahan Manual", type="primary", use_container_width=True):
+                updated = list(st.session_state["_batch_results"])
+                for i, row in edited_df.iterrows():
+                    orig = updated[i]
+                    if orig.get("_result") is None:
+                        continue  # baris ERROR - tidak punya hasil AI, tidak bisa dioverride
+                    proposed = {c: row[c] for c in MANUAL_EDIT_FIELDS}
+                    changed = any(proposed[c] != orig.get(c) for c in MANUAL_EDIT_FIELDS)
+                    if changed:
+                        if not orig.get("_manual_override"):
+                            orig["_ai_original"] = {c: orig.get(c) for c in MANUAL_EDIT_FIELDS}
+                        proposed = _cascade_edit(proposed, orig)
+                        for c in MANUAL_EDIT_FIELDS:
+                            orig[c] = proposed[c]
+                        orig["_manual_override"] = True
+                    updated[i] = orig
+                st.session_state["_batch_results"] = updated
+                st.session_state["_batch_edit_version"] = st.session_state.get("_batch_edit_version", 0) + 1
+                st.success("Perubahan manual disimpan.")
+                st.rerun()
+        with ecol2:
+            if n_override and st.button("↩️ Kembalikan Semua ke Rekomendasi AI", use_container_width=True):
+                updated = list(st.session_state["_batch_results"])
+                for i, r in enumerate(updated):
+                    if r.get("_manual_override"):
+                        r.update(r["_ai_original"])
+                        r["_manual_override"] = False
+                        del r["_ai_original"]
+                    updated[i] = r
+                st.session_state["_batch_results"] = updated
+                st.session_state["_batch_edit_version"] = st.session_state.get("_batch_edit_version", 0) + 1
+                st.rerun()
+
         st.download_button(
-            "⬇️ Download Hasil (CSV)", data=display_df.to_csv(index=False).encode("utf-8"),
+            "⬇️ Download Hasil (CSV)", data=editable_df.to_csv(index=False).encode("utf-8"),
             file_name=f"hasil_screening_batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv",
         )
 
+        if belum_narasi_idx:
+            if st.button(f"🤖 Generate Narasi (LLM) untuk {len(belum_narasi_idx)} Nasabah"):
+                progress = st.progress(0.0, text="Menyusun narasi...")
+                updated = list(st.session_state["_batch_results"])
+                for done, i in enumerate(belum_narasi_idx):
+                    updated[i] = run_llm_narrative(updated[i])
+                    progress.progress((done + 1) / len(belum_narasi_idx), text=f"Menyusun narasi {done + 1}/{len(belum_narasi_idx)}...")
+                progress.empty()
+                st.session_state["_batch_results"] = updated
+                st.rerun()
+
+        n_llm_fallback = sum(1 for r in st.session_state["_batch_results"] if r.get("_fallback_reason"))
+        if n_llm_fallback:
+            st.caption(f"{n_llm_fallback} baris fallback ke narasi rule-based (LLM gagal) — lihat detail di bawah.")
+
         with st.expander("AI Insight per Nasabah"):
             for r in st.session_state["_batch_results"]:
-                st.markdown(f"**{r['application_id']} — {r['company_name']}**: {r['_insight']}")
+                st.markdown(f"**{r['application_id']} — {r['company_name']}**: {r.get('Alasan') or r['_insight']}")
                 if r.get("_fallback_reason"):
                     st.caption(f"⚠️ Fallback: {r['_fallback_reason']}")
 
         if st.button("🗑️ Bersihkan hasil batch"):
             del st.session_state["_batch_results"]
+            st.session_state.pop("_batch_edit_version", None)
             st.rerun()
 
 # ---------------------------------------------------------------------------
@@ -396,7 +545,7 @@ with tab_manual:
         with c18:
             collateral_city = st.text_input("Kota Agunan", value=sv("collateral_city", ""))
 
-        submitted = st.form_submit_button("🤖 Jalankan AI Screening", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("🤖 Jalankan AI Screening (ML)", type="primary", use_container_width=True)
 
     if submitted:
         nik_clean = nik.strip()
@@ -425,22 +574,106 @@ with tab_manual:
             "collateral_location": collateral_location, "collateral_province": collateral_province, "collateral_city": collateral_city,
         }
         application_id = f"SIM{datetime.now().strftime('%Y%m%d%H%M%S')}"
-        with st.spinner("Menyusun analisis..."):
-            result_row = screen_one_applicant(user_fields, application_id)
+        with st.spinner("Menjalankan model screening (ML)..."):
+            st.session_state["_manual_result"] = run_ml_screening(user_fields, application_id)
+        for k in ("_edit_decision", "_edit_zone", "_edit_risk_score", "_edit_jenis", "_edit_nominal", "_edit_tenor", "_edit_bunga"):
+            st.session_state.pop(k, None)
+
+    if st.session_state.get("_manual_result"):
+        result_row = st.session_state["_manual_result"]
 
         st.divider()
-        st.markdown('<div class="section-title">📊 Hasil AI Screening</div>', unsafe_allow_html=True)
-        display_row = {k: v for k, v in result_row.items() if not k.startswith("_") and k != "NIK"}
+        st.markdown('<div class="section-title">📊 Hasil AI Screening (ML)</div>', unsafe_allow_html=True)
+        if result_row.get("_manual_override"):
+            st.caption("✏️ Hasil di bawah SUDAH diedit manual dari rekomendasi AI.")
+        display_row = {k: v for k, v in result_row.items() if not k.startswith("_") and k not in ("NIK", "Alasan")}
         st.dataframe(pd.DataFrame([display_row]), hide_index=True, use_container_width=True)
 
-        if result_row["_fallback_reason"]:
-            st.warning(
-                f"⚠️ Kolom \"Alasan\" di atas adalah **fallback** ke insight rule-based — narasi LLM (Gemma) "
-                f"gagal dihasilkan. Alasan teknis: `{result_row['_fallback_reason']}`"
-            )
+        with st.expander("✏️ Sesuaikan Hasil Screening (Manual Override)", expanded=False):
+            st.caption("Tidak setuju dengan rekomendasi AI? Ubah field di bawah lalu simpan — nilai AI asli tetap tersimpan dan bisa dikembalikan kapan saja.")
+            ec1, ec2, ec3 = st.columns(3)
+            with ec1:
+                edit_decision = st.selectbox(
+                    "Decision (Eligibility Recommendation)", DECISION_OPTIONS,
+                    index=DECISION_OPTIONS.index(result_row["Decision (Eligibility Recommendation)"]) if result_row["Decision (Eligibility Recommendation)"] in DECISION_OPTIONS else 0,
+                    key="_edit_decision",
+                )
+                edit_zone = st.selectbox(
+                    "Zone", ZONE_OPTIONS,
+                    index=ZONE_OPTIONS.index(result_row["Zone"]) if result_row["Zone"] in ZONE_OPTIONS else 0,
+                    key="_edit_zone",
+                )
+            with ec2:
+                edit_risk_score = st.number_input(
+                    "Credit Eligibility Score", min_value=0.0, max_value=1.0, step=0.01,
+                    value=float(result_row["Credit Eligibility Score"] or 0.0), key="_edit_risk_score",
+                )
+                edit_jenis = st.selectbox(
+                    "Jenis Kredit", JENIS_KREDIT_OPTIONS,
+                    index=JENIS_KREDIT_OPTIONS.index(result_row["Jenis Kredit"]) if result_row["Jenis Kredit"] in JENIS_KREDIT_OPTIONS else 0,
+                    key="_edit_jenis",
+                )
+            with ec3:
+                edit_nominal = st.number_input(
+                    "Nominal Disetujui (Rp)", min_value=0, step=1_000_000,
+                    value=int(result_row["Nominal Disetujui"] or 0), key="_edit_nominal",
+                )
+                edit_tenor = st.number_input(
+                    "Jangka Waktu (bulan)", min_value=0, step=1,
+                    value=int(result_row["Jangka Waktu (bulan)"] or 0), key="_edit_tenor",
+                )
+                edit_bunga = st.number_input(
+                    "Bunga (% p.a.)", min_value=0.0, step=0.1,
+                    value=float(result_row["Bunga (% p.a.)"] or 0.0), key="_edit_bunga",
+                )
 
-        with st.expander("Insight teknis dari model (sementara, bukan kolom Alasan di atas)"):
+            bcol1, bcol2 = st.columns(2)
+            with bcol1:
+                if st.button("💾 Simpan Perubahan Manual", type="primary", use_container_width=True):
+                    if not result_row.get("_manual_override"):
+                        result_row["_ai_original"] = {c: result_row[c] for c in MANUAL_EDIT_FIELDS}
+                    proposed = {
+                        "Decision (Eligibility Recommendation)": edit_decision, "Zone": edit_zone,
+                        "Credit Eligibility Score": edit_risk_score, "Jenis Kredit": edit_jenis,
+                        "Nominal Disetujui": edit_nominal, "Jangka Waktu (bulan)": edit_tenor,
+                        "Bunga (% p.a.)": edit_bunga,
+                    }
+                    proposed = _cascade_edit(proposed, result_row)
+                    for c in MANUAL_EDIT_FIELDS:
+                        result_row[c] = proposed[c]
+                    result_row["_manual_override"] = True
+                    st.session_state["_manual_result"] = result_row
+                    for k in ("_edit_decision", "_edit_zone", "_edit_risk_score", "_edit_jenis", "_edit_nominal", "_edit_tenor", "_edit_bunga"):
+                        st.session_state.pop(k, None)
+                    st.success("Perubahan manual disimpan (field turunan Credit Eligibility Score ikut disesuaikan otomatis).")
+                    st.rerun()
+            with bcol2:
+                if result_row.get("_manual_override") and st.button("↩️ Kembalikan ke Rekomendasi AI", use_container_width=True):
+                    result_row.update(result_row["_ai_original"])
+                    result_row["_manual_override"] = False
+                    del result_row["_ai_original"]
+                    st.session_state["_manual_result"] = result_row
+                    for k in ("_edit_decision", "_edit_zone", "_edit_risk_score", "_edit_jenis", "_edit_nominal", "_edit_tenor", "_edit_bunga"):
+                        st.session_state.pop(k, None)
+                    st.rerun()
+
+        with st.expander("Insight teknis dari model (rule-based, tersedia instan)"):
             st.write(result_row["_insight"])
             if result_row["_shap"]:
                 st.caption("Faktor paling berpengaruh terhadap skor (SHAP):")
                 st.dataframe(pd.DataFrame(result_row["_shap"]), hide_index=True, use_container_width=True)
+
+        st.markdown('<div class="section-title">🗣️ Narasi (LLM)</div>', unsafe_allow_html=True)
+        if result_row.get("Alasan"):
+            st.write(result_row["Alasan"])
+            if result_row.get("_fallback_reason"):
+                st.warning(
+                    f"⚠️ Narasi di atas adalah **fallback** ke insight rule-based — narasi LLM (Gemma) "
+                    f"gagal dihasilkan. Alasan teknis: `{result_row['_fallback_reason']}`"
+                )
+        else:
+            st.caption("Belum digenerate — klik tombol di bawah kalau perlu narasi natural untuk laporan (opsional, Credit Eligibility Score di atas sudah final).")
+            if st.button("🤖 Generate Narasi (LLM)"):
+                with st.spinner("Menyusun narasi dengan LLM..."):
+                    st.session_state["_manual_result"] = run_llm_narrative(result_row)
+                st.rerun()
