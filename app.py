@@ -1,4 +1,4 @@
-"""Overview — Screening Credit Agentic AI."""
+"""Overview — Credit Screening  Agentic AI."""
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -6,7 +6,7 @@ import streamlit as st
 from utils.data_loader import get_filtered_data, load_master_data
 from utils.ui_components import ZONE_COLORS, apply_logo
 
-st.set_page_config(page_title="Screening Credit Agentic AI", page_icon="🏦", layout="wide")
+st.set_page_config(page_title="Credit Screening Agentic AI", page_icon="🏦", layout="wide")
 apply_logo()
 
 ZONE_ORDER = ["Hijau", "Kuning", "Merah"]
@@ -29,7 +29,7 @@ def format_rupiah_compact(value: float) -> str:
     return f"Rp {value:,.0f}".replace(",", ".")
 
 
-st.title("🏦 Screening Credit Agentic AI eLO")
+st.title("🏦 Credit Screening Agentic AI eLO")
 st.caption("Sistem multi-agent untuk screening awal kelayakan kredit UMKM (prinsip 5C) — hasil scoring dihitung live oleh 7-agent pipeline setiap data dimuat.")
 
 df = load_master_data()
