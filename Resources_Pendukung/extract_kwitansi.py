@@ -1,115 +1,115 @@
 """
-extract_kwitansi.py
+extract_kwitansi_lightonocr.py
 Ekstraksi data kwitansi (pembelian & penjualan) dari foto (di dalam file .zip)
-menggunakan Claude Vision, lalu hitung Omset dan Profit per nasabah.
+menggunakan model VLM lokal LightOnOCR-2-1B (sama seperti di notebook contoh),
+lalu hitung Omset dan Profit per nasabah, per tahun.
 
-Cara pakai di Claude Code:
-    1. pip install anthropic
-    2. export ANTHROPIC_API_KEY=sk-ant-...
-    3. Siapkan satu file .zip berisi foto-foto kwitansi (.jpg/.png), boleh campur
+Cara pakai (butuh GPU untuk kecepatan wajar, tapi bisa jalan di CPU juga):
+    1. pip install -q git+https://github.com/huggingface/transformers pillow torch pandas
+    2. Siapkan satu file .zip berisi foto kwitansi (.jpg/.png), boleh campur
        kwitansi dari beberapa nasabah/usaha sekaligus.
-    4. python extract_kwitansi.py --zip kwitansi.zip --output_csv hasil_kwitansi.csv
+    3. python extract_kwitansi_lightonocr.py --zip kwitansi.zip
 
 Output:
     - hasil_kwitansi.csv          -> detail per kwitansi (untuk audit/debug)
     - ringkasan_omset_profit.csv  -> satu baris per nasabah (nik_pemilik), dengan
-                                      kolom omset_<tahun> dan profit_<tahun> untuk
-                                      tiap tahun yang muncul di data (mis. omset_2024,
-                                      profit_2024, omset_2025, profit_2025, ...)
+                                      kolom omset_<tahun> dan profit_<tahun>
     - ringkasan juga dicetak ke terminal
 """
 
 import os
+import re
 import json
-import base64
 import argparse
 import zipfile
 import tempfile
 from pathlib import Path
 
+import torch
 import pandas as pd
-from anthropic import Anthropic
+from PIL import Image
+from transformers import LightOnOcrForConditionalGeneration, LightOnOcrProcessor
 
-client = Anthropic()
+# ---------------------------------------------------------------------------
+# LOAD MODEL (sama seperti di notebook contoh)
+# ---------------------------------------------------------------------------
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+DTYPE = torch.bfloat16
 
-MODEL = "claude-sonnet-4-6"  # bisa diganti ke model lain sesuai kebutuhan
+print(f"Loading LightOnOCR-2-1B di device={DEVICE} ...")
+model = LightOnOcrForConditionalGeneration.from_pretrained(
+    "lightonai/LightOnOCR-2-1B", torch_dtype=DTYPE
+).to(DEVICE)
+processor = LightOnOcrProcessor.from_pretrained("lightonai/LightOnOCR-2-1B")
+
 
 # ---------------------------------------------------------------------------
 # PROMPT EKSTRAKSI
-# Ini bagian paling penting: prompt yang memaksa Claude mengembalikan JSON
-# terstruktur dan konsisten, apapun isi kwitansinya (pembelian/penjualan).
+# Sama fungsinya seperti prompt "Extract all the text from this image." di
+# notebook contoh, tapi diarahkan supaya modelnya keluarkan JSON terstruktur
+# sesuai kebutuhan kita (bukan cuma teks OCR mentah).
 # ---------------------------------------------------------------------------
-EXTRACTION_PROMPT = """Kamu adalah sistem OCR + ekstraksi data untuk kwitansi bisnis Indonesia.
-
-Baca gambar kwitansi berikut dan ekstrak informasinya SEBAGAI JSON VALID SAJA,
-tanpa teks lain, tanpa markdown code fence, mengikuti schema persis di bawah ini:
+EXTRACTION_PROMPT = """Baca kwitansi di gambar ini dan keluarkan HANYA JSON valid
+(tanpa teks lain, tanpa markdown code fence) dengan schema persis:
 
 {
   "nama_usaha": string,
   "nik_pemilik": string,
-  "industri": string,
-  "sub_industri": string,
   "jenis_kwitansi": "penjualan" | "pembelian",
   "no_kwitansi": string,
   "tanggal": "YYYY-MM-DD",
-  "pihak_terkait": string,           // "Kepada" jika penjualan, "Dibeli dari" jika pembelian
-  "items": [
-    {
-      "deskripsi": string,
-      "qty": number,
-      "harga_satuan": number,        // angka murni, tanpa "Rp" atau titik ribuan
-      "subtotal": number
-    }
-  ],
-  "total": number,                    // angka murni dari baris TOTAL
-  "status_lunas": boolean             // true jika ada stempel/label "LUNAS"
+  "pihak_terkait": string,
+  "total": number
 }
 
 Aturan:
-- Semua nilai uang HARUS angka murni (integer), buang "Rp" dan pemisah ribuan.
-- Jika field tidak terbaca/tidak ada di gambar, isi dengan null.
-- Jika "total" di gambar tidak sama persis dengan jumlah subtotal items (karena
-  pembulatan atau OCR), tetap pakai angka yang tertulis di baris TOTAL.
-- jenis_kwitansi ditentukan dari judul dokumen: "KWITANSI PENJUALAN" -> "penjualan",
-  "KWITANSI PEMBELIAN" -> "pembelian".
-- Output HARUS JSON valid dan bisa langsung di-parse json.loads(), tidak ada teks
-  pembuka/penutup, tidak ada ```.
+- Nilai "total" HARUS angka murni (integer), buang "Rp" dan pemisah ribuan.
+- jenis_kwitansi: "KWITANSI PENJUALAN" -> "penjualan", "KWITANSI PEMBELIAN" -> "pembelian".
+- Jika field tidak terbaca, isi null.
+- Output HARUS JSON valid, tanpa teks pembuka/penutup, tanpa ```.
 """
 
 
-def encode_image(path: Path) -> tuple[str, str]:
-    media_type = "image/jpeg" if path.suffix.lower() in [".jpg", ".jpeg"] else "image/png"
-    with open(path, "rb") as f:
-        data = base64.standard_b64encode(f.read()).decode("utf-8")
-    return data, media_type
+def extract_one(image_path: Path) -> dict:
+    image = Image.open(image_path).convert("RGB")
 
+    conversation = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image"},
+                {"type": "text", "text": EXTRACTION_PROMPT},
+            ],
+        }
+    ]
 
-def extract_one(path: Path) -> dict:
-    data, media_type = encode_image(path)
-    response = client.messages.create(
-        model=MODEL,
-        max_tokens=1500,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "source": {"type": "base64", "media_type": media_type, "data": data},
-                    },
-                    {"type": "text", "text": EXTRACTION_PROMPT},
-                ],
-            }
-        ],
+    prompt = processor.apply_chat_template(
+        conversation, add_generation_prompt=True, tokenize=False
     )
-    raw_text = response.content[0].text.strip()
-    # Jaga-jaga kalau model tetap membungkus dengan ```json ... ```
-    raw_text = raw_text.replace("```json", "").replace("```", "").strip()
+
+    inputs = processor(text=prompt, images=[image], return_tensors="pt").to(DEVICE, dtype=DTYPE)
+    inputs = {
+        k: v.to(device=DEVICE, dtype=DTYPE) if v.is_floating_point() else v.to(DEVICE)
+        for k, v in inputs.items()
+    }
+
+    output_ids = model.generate(**inputs, max_new_tokens=512)
+    generated_ids = output_ids[0, inputs["input_ids"].shape[1]:]
+    output_text = processor.decode(generated_ids, skip_special_tokens=True).strip()
+
+    # Bersihkan kalau model tetap membungkus dengan ```json ... ```
+    output_text = output_text.replace("```json", "").replace("```", "").strip()
+
+    # Kalau ada teks tambahan di luar JSON, coba ambil blok {...} pertama
+    match = re.search(r"\{.*\}", output_text, re.DOTALL)
+    json_str = match.group(0) if match else output_text
+
     try:
-        parsed = json.loads(raw_text)
+        parsed = json.loads(json_str)
     except json.JSONDecodeError:
-        parsed = {"error": "gagal parse JSON", "raw_output": raw_text, "file": path.name}
-    parsed["source_file"] = path.name
+        parsed = {"error": "gagal parse JSON", "raw_output": output_text}
+
+    parsed["source_file"] = image_path.name
     return parsed
 
 
@@ -129,13 +129,9 @@ def main():
     with zipfile.ZipFile(zip_path, "r") as zf:
         zf.extractall(tmp_dir)
 
-    # Cari semua gambar, termasuk yang ada di dalam subfolder (mis. hasil unzip macOS)
     image_files = sorted(
-        [
-            p
-            for p in tmp_dir.rglob("*")
-            if p.suffix.lower() in [".jpg", ".jpeg", ".png"] and not p.name.startswith(".")
-        ]
+        p for p in tmp_dir.rglob("*")
+        if p.suffix.lower() in [".jpg", ".jpeg", ".png"] and not p.name.startswith(".")
     )
 
     if not image_files:
@@ -147,10 +143,9 @@ def main():
     results = []
     for i, path in enumerate(image_files, 1):
         print(f"[{i}/{len(image_files)}] Memproses {path.name} ...")
-        parsed = extract_one(path)
-        results.append(parsed)
+        results.append(extract_one(path))
 
-    # ---- Simpan hasil detail (per kwitansi, items dipipihkan jadi JSON string) ----
+    # ---- Simpan hasil detail per kwitansi ----
     rows = []
     for r in results:
         if "error" in r:
@@ -165,11 +160,7 @@ def main():
                 "pihak_terkait": r.get("pihak_terkait"),
                 "nama_usaha": r.get("nama_usaha"),
                 "nik_pemilik": r.get("nik_pemilik"),
-                "industri": r.get("industri"),
-                "sub_industri": r.get("sub_industri"),
                 "total": r.get("total"),
-                "status_lunas": r.get("status_lunas"),
-                "items_json": json.dumps(r.get("items", []), ensure_ascii=False),
             }
         )
 
@@ -178,14 +169,16 @@ def main():
     print(f"\nHasil ekstraksi disimpan ke: {args.output_csv}")
 
     # ---- Hitung Omset & Profit per nasabah, dipecah per tahun ----
-    df_valid = df[df["total"].notna() & df["tanggal"].notna()].copy()
+    df_valid = df[df["total"].notna() & df["tanggal"].notna()].copy() if not df.empty else df
+    if df_valid.empty:
+        print("Tidak ada kwitansi yang berhasil diekstrak dengan lengkap.")
+        return
+
     df_valid["total"] = pd.to_numeric(df_valid["total"], errors="coerce")
     df_valid["tahun"] = pd.to_datetime(df_valid["tanggal"], errors="coerce").dt.year
-
     df_valid = df_valid[df_valid["tahun"].notna()]
     df_valid["tahun"] = df_valid["tahun"].astype(int)
 
-    # Total per (nik, tahun, jenis)
     grouped = (
         df_valid.groupby(["nik_pemilik", "tahun", "jenis_kwitansi"])["total"]
         .sum()
@@ -198,7 +191,6 @@ def main():
     grouped["profit"] = grouped["penjualan"] - grouped["pembelian"]
     grouped = grouped.reset_index()
 
-    # Pivot jadi kolom omset_2024, profit_2024, omset_2025, profit_2025, dst.
     nama_usaha_map = df_valid.groupby("nik_pemilik")["nama_usaha"].agg(
         lambda s: s.dropna().iloc[0] if s.notna().any() else None
     )
