@@ -18,6 +18,22 @@ DECISION_COLORS = {
     "Tidak Layak": ZONE_COLORS["Merah"],
 }
 
+# Koordinat kota (Jabodetabek) untuk peta sebaran nasabah — approx centroid kota,
+# dipakai karena master_dataset tidak menyimpan lat/lon secara langsung.
+CITY_COORDS = {
+    "Jakarta Selatan": (-6.2615, 106.8106),
+    "Jakarta Pusat": (-6.1805, 106.8284),
+    "Jakarta Timur": (-6.2250, 106.9004),
+    "Jakarta Barat": (-6.1352, 106.8133),
+    "Jakarta Utara": (-6.1481, 106.8998),
+    "Bekasi": (-6.2383, 106.9756),
+    "Depok": (-6.4025, 106.7942),
+    "Bogor": (-6.5971, 106.8060),
+    "Tangerang Selatan": (-6.2897, 106.7186),
+    "Tangerang": (-6.1783, 106.6319),
+}
+
+
 def format_rupiah_compact(value: float) -> str:
     value = float(value)
     if abs(value) >= 1e12:
@@ -86,40 +102,66 @@ with c2:
 
 st.divider()
 
-# --- Kesehatan keuangan & fairness check ----------------------------------
-c3, c4 = st.columns(2)
+# --- Profil Finansial Nasabah ---------------------------------------------
+st.subheader("Profil Finansial Nasabah")
+c3, c4, c5 = st.columns(3)
 with c3:
-    st.subheader("Kesehatan Keuangan Portofolio")
     growth_health = pd.Series(["Growth Positif" if g > 0 else "Growth Negatif" for g in filtered["revenue_growth_pct"]])
     counts = growth_health.value_counts().reset_index()
     counts.columns = ["kategori", "count"]
     fig = px.pie(counts, names="kategori", values="count", color="kategori",
-                 color_discrete_map={"Growth Positif": ZONE_COLORS["Hijau"], "Growth Negatif": ZONE_COLORS["Merah"]}, hole=0.45)
+                 color_discrete_map={"Growth Positif": ZONE_COLORS["Hijau"], "Growth Negatif": ZONE_COLORS["Merah"]},
+                 hole=0.45, title="Kesehatan Growth Omzet")
     st.plotly_chart(fig, use_container_width=True)
 
 with c4:
-    st.subheader("Fairness Check — Approval Rate per Gender")
-    st.caption("owner_gender tidak dipakai sebagai fitur scoring — panel ini murni untuk monitoring bias, bukan input agent.")
-    gender_stats = filtered.groupby("owner_gender")["decision"].apply(lambda s: s.isin(["Layak", "Layak Bersyarat"]).mean() * 100).reset_index()
-    gender_stats.columns = ["owner_gender", "approval_rate"]
-    fig = px.bar(gender_stats, x="owner_gender", y="approval_rate", text_auto=".1f", color="owner_gender")
-    fig.update_layout(showlegend=False, yaxis_title="Approval Rate (%)", xaxis_title=None)
+    omzet_juta = filtered["monthly_turnover_est"] / 1_000_000
+    fig = px.histogram(omzet_juta, nbins=25, title="Distribusi Omzet Bulanan")
+    fig.update_layout(showlegend=False, xaxis_title="Omzet Bulanan (Juta Rp)", yaxis_title="Jumlah Nasabah")
+    st.plotly_chart(fig, use_container_width=True)
+
+with c5:
+    fig = px.histogram(filtered, x="employee_count", nbins=20, title="Distribusi Jumlah Karyawan")
+    fig.update_layout(xaxis_title="Jumlah Karyawan", yaxis_title="Jumlah Nasabah")
     st.plotly_chart(fig, use_container_width=True)
 
 st.divider()
 
-# --- Komposisi nasabah -----------------------------------------------------
-st.subheader("Komposisi Nasabah")
-c5, c6, c7 = st.columns(3)
-with c5:
+# --- Profil Nasabah ---------------------------------------------------------
+st.subheader("Profil Nasabah")
+c6, c7, c8 = st.columns(3)
+with c6:
     fig = px.pie(filtered, names="legal_entity", title="Badan Usaha", hole=0.45)
     st.plotly_chart(fig, use_container_width=True)
-with c6:
+with c7:
     fig = px.pie(filtered, names="owner_education", title="Pendidikan Pemilik", hole=0.45)
     st.plotly_chart(fig, use_container_width=True)
-with c7:
+with c8:
     fig = px.histogram(filtered, x="owner_age", nbins=20, title="Usia Pemilik")
     fig.update_layout(yaxis_title="Jumlah", xaxis_title="Usia")
+    st.plotly_chart(fig, use_container_width=True)
+
+c9, c10 = st.columns([1, 1.6])
+with c9:
+    fig = px.histogram(filtered, x="business_age_year", nbins=20, title="Usia Usaha")
+    fig.update_layout(yaxis_title="Jumlah", xaxis_title="Usia Usaha (Tahun)")
+    st.plotly_chart(fig, use_container_width=True)
+
+with c10:
+    city_counts = filtered["city"].value_counts().reset_index()
+    city_counts.columns = ["city", "count"]
+    city_counts["lat"] = city_counts["city"].map(lambda c: CITY_COORDS.get(c, (None, None))[0])
+    city_counts["lon"] = city_counts["city"].map(lambda c: CITY_COORDS.get(c, (None, None))[1])
+    city_counts = city_counts.dropna(subset=["lat", "lon"])
+    fig = px.scatter_mapbox(
+        city_counts, lat="lat", lon="lon", size="count", color="count",
+        hover_name="city", hover_data={"count": True, "lat": False, "lon": False},
+        color_continuous_scale="Teal", size_max=40, zoom=8.5, title="Sebaran Wilayah Nasabah",
+    )
+    # scattermapbox tidak mendukung marker outline ("line"), jadi kontras dijaga lewat
+    # opacity tinggi + sizemin supaya bubble kecil tetap kelihatan di atas peta terang.
+    fig.update_traces(marker=dict(opacity=0.85, sizemin=6))
+    fig.update_layout(mapbox_style="open-street-map", margin={"r": 0, "t": 40, "l": 0, "b": 0})
     st.plotly_chart(fig, use_container_width=True)
 
 st.divider()

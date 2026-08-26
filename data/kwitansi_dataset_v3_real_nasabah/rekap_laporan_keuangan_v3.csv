@@ -1,0 +1,51 @@
+nik,nama_usaha,industri,sub_industri,total_penjualan_revenue,total_pembelian_expense,n_kwitansi_penjualan,n_kwitansi_pembelian,estimasi_profit_rugi
+3671015401820466,PT Halim Makmur,Perdagangan,Toko Alat Tulis,0,34357000,0,1,-34357000
+3674012201850905,PT Santoso Mandiri,Perdagangan,Distributor Bahan Bangunan,0,36878000,0,1,-36878000
+3174016012732640,PT Firmansyah Makmur,Transportasi,Rental Kendaraan,0,15412000,0,1,-15412000
+3275010607902126,PT Susanto Mandiri,Perdagangan,Distributor Elektronik,0,22451000,0,1,-22451000
+3671016101811963,UD Gunawan Sejahtera,Pertanian,Distributor Hasil Tani,1523000,0,1,0,1523000
+3172015110690312,PT Siregar Mandiri,Pertanian,Peternakan Ayam,0,15862000,0,1,-15862000
+3174015901751662,UD Tanjung Abadi,Jasa,Bengkel,6340000,0,1,0,6340000
+3671013108902854,UD Hutapea Mandiri,Kuliner,Katering,0,8807000,0,1,-8807000
+3171014105771889,CV Saputra Mandiri,Perdagangan,Grosir Pakaian,21518000,0,1,0,21518000
+3275012107840491,PT Panjaitan Mandiri,Perdagangan,Toko Alat Tulis,1974000,0,1,0,1974000
+3674016301811908,UD Simanjuntak Jaya,Perdagangan,Distributor Elektronik,16860000,0,1,0,16860000
+3674010712812957,CV Lubis Mandiri,Transportasi,Ekspedisi Kecil,30870000,0,1,0,30870000
+3671015802750760,CV Wibowo Makmur,Jasa,Bengkel,10941000,0,1,0,10941000
+3174011203731792,CV Halim Mandiri,Kuliner,Katering,1128000,0,1,0,1128000
+3173015706850720,PT Firmansyah Abadi,Transportasi,Ekspedisi Kecil,15681000,0,1,0,15681000
+3275010902990076,PT Wijaya Makmur,Pertanian,Distributor Hasil Tani,15273000,0,1,0,15273000
+3671011009710295,UD Siregar Sejahtera,Manufaktur,Furniture,58891000,0,1,0,58891000
+3173014812731531,PT Kurniawan Sejahtera,Perdagangan,Distributor Elektronik,7483000,0,1,0,7483000
+3671016012760030,PT Kusuma Makmur,Manufaktur,Konveksi,0,14205000,0,1,-14205000
+3276016206020481,CV Kusuma Mandiri,Kuliner,Warung Makan,477000,0,1,0,477000
+3172010807841979,CV Susanto Jaya,Manufaktur,Konveksi,5949000,0,1,0,5949000
+3671010101901153,UD Wibowo Jaya,Manufaktur,Furniture,0,92392000,0,1,-92392000
+3271012605031469,CV Lubis Jaya,Pertanian,Peternakan Ayam,1089000,0,1,0,1089000
+3276010506021140,CV Tanjung Mandiri,Jasa,Laundry,1248000,0,1,0,1248000
+3175012806900658,UD Halim Sejahtera,Perdagangan,Distributor Bahan Bangunan,6251000,0,1,0,6251000
+3172016310770134,UD Susanto Abadi,Transportasi,Ekspedisi Kecil,0,6960000,0,1,-6960000
+3175014906691903,UD Susanto Jaya,Jasa,Laundry,0,1612000,0,1,-1612000
+3271015810652307,UD Santoso Sejahtera,Transportasi,Ekspedisi Kecil,12628000,0,1,0,12628000
+3271012608001565,PT Panjaitan Mandiri,Pertanian,Distributor Hasil Tani,0,14352000,0,1,-14352000
+3276014602900567,PT Wibowo Abadi,Perdagangan,Grosir Pakaian,0,17605000,0,1,-17605000
+3671016304930706,CV Susanto Makmur,Pertanian,Peternakan Ayam,0,4105000,0,1,-4105000
+3671016811871682,CV Situmorang Jaya,Jasa,Percetakan,0,1034000,0,1,-1034000
+3175011505980371,PT Situmorang Jaya,Pertanian,Distributor Hasil Tani,16494000,0,1,0,16494000
+3173016104810551,CV Gunawan Mandiri,Pertanian,Distributor Hasil Tani,0,23802000,0,1,-23802000
+3276015211810843,PT Simanjuntak Abadi,Pertanian,Peternakan Ayam,0,11647000,0,1,-11647000
+3271014612651173,UD Panjaitan Jaya,Pertanian,Distributor Hasil Tani,642000,0,1,0,642000
+3271010112950979,UD Gunawan Makmur,Transportasi,Ekspedisi Kecil,0,46736000,0,1,-46736000
+3175011106960739,CV Wijaya Sejahtera,Kuliner,Warung Makan,0,4913000,0,1,-4913000
+3674015803650287,UD Santoso Jaya,Transportasi,Ekspedisi Kecil,0,12278000,0,1,-12278000
+3275016202670603,CV Tanjung Abadi,Perdagangan,Distributor Elektronik,98606000,0,1,0,98606000
+3674014806992653,PT Setiawan Mandiri,Manufaktur,Furniture,113425000,0,1,0,113425000
+3671011702742660,PT Handoko Mandiri,Pertanian,Distributor Hasil Tani,10146000,0,1,0,10146000
+3275012306841013,UD Saputra Abadi,Pertanian,Peternakan Ayam,0,2373000,0,1,-2373000
+3174015807871393,UD Permana Sejahtera,Transportasi,Rental Kendaraan,0,87066000,0,1,-87066000
+3275011701722370,PT Lubis Abadi,Kuliner,Katering,0,6595000,0,1,-6595000
+3275012104941518,PT Permana Mandiri,Kuliner,Bakery,0,1130000,0,1,-1130000
+3173010108932677,CV Situmorang Sejahtera,Jasa,Laundry,0,1175000,0,1,-1175000
+3275011809022488,PT Hutapea Jaya,Transportasi,Ekspedisi Kecil,34372000,0,1,0,34372000
+3171015506962444,PT Siregar Makmur,Transportasi,Ekspedisi Kecil,0,2538000,0,1,-2538000
+3671016905951783,UD Permana Sejahtera,Transportasi,Rental Kendaraan,0,17203000,0,1,-17203000

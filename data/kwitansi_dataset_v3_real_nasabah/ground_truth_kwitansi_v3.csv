@@ -1,0 +1,51 @@
+file_name,nik,nama_usaha,industri,sub_industri,jenis_kwitansi,no_kwitansi,tanggal,pihak_lain,jumlah_item,total_amount
+kwitansi_001_pembelian_367101.jpg,3671015401820466,PT Halim Makmur,Perdagangan,Toko Alat Tulis,PEMBELIAN,KP-202506-0001,2025-06-08,PT Distribusi Nusantara,2,34357000
+kwitansi_002_pembelian_367401.jpg,3674012201850905,PT Santoso Mandiri,Perdagangan,Distributor Bahan Bangunan,PEMBELIAN,KP-202509-0001,2025-09-22,UD Barokah Supplier,2,36878000
+kwitansi_003_pembelian_317401.jpg,3174016012732640,PT Firmansyah Makmur,Transportasi,Rental Kendaraan,PEMBELIAN,KP-202507-0001,2025-07-19,PT Aneka Pangan Sejahtera,2,15412000
+kwitansi_004_pembelian_327501.jpg,3275010607902126,PT Susanto Mandiri,Perdagangan,Distributor Elektronik,PEMBELIAN,KP-202502-0001,2025-02-01,PT Distribusi Nusantara,2,22451000
+kwitansi_005_penjualan_367101.jpg,3671016101811963,UD Gunawan Sejahtera,Pertanian,Distributor Hasil Tani,PENJUALAN,KJ-202403-0001,2024-03-12,PT Sinergi Distribusi,3,1523000
+kwitansi_006_pembelian_317201.jpg,3172015110690312,PT Siregar Mandiri,Pertanian,Peternakan Ayam,PEMBELIAN,KP-202412-0001,2024-12-06,Toko Grosir Jaya,2,15862000
+kwitansi_007_penjualan_317401.jpg,3174015901751662,UD Tanjung Abadi,Jasa,Bengkel,PENJUALAN,KJ-202406-0001,2024-06-16,CV Berkah Logistik,3,6340000
+kwitansi_008_pembelian_367101.jpg,3671013108902854,UD Hutapea Mandiri,Kuliner,Katering,PEMBELIAN,KP-202409-0001,2024-09-11,PT Distribusi Nusantara,4,8807000
+kwitansi_009_penjualan_317101.jpg,3171014105771889,CV Saputra Mandiri,Perdagangan,Grosir Pakaian,PENJUALAN,KJ-202401-0001,2024-01-29,Ibu Wulandari,2,21518000
+kwitansi_010_penjualan_327501.jpg,3275012107840491,PT Panjaitan Mandiri,Perdagangan,Toko Alat Tulis,PENJUALAN,KJ-202401-0001,2024-01-25,Bpk. Agus Salim,3,1974000
+kwitansi_011_penjualan_367401.jpg,3674016301811908,UD Simanjuntak Jaya,Perdagangan,Distributor Elektronik,PENJUALAN,KJ-202401-0001,2024-01-26,Bpk. Fajar Nugroho,2,16860000
+kwitansi_012_penjualan_367401.jpg,3674010712812957,CV Lubis Mandiri,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202402-0001,2024-02-17,CV Berkah Logistik,3,30870000
+kwitansi_013_penjualan_367101.jpg,3671015802750760,CV Wibowo Makmur,Jasa,Bengkel,PENJUALAN,KJ-202402-0001,2024-02-12,Ibu Wulandari,3,10941000
+kwitansi_014_penjualan_317401.jpg,3174011203731792,CV Halim Mandiri,Kuliner,Katering,PENJUALAN,KJ-202506-0001,2025-06-13,Bpk. Agus Salim,2,1128000
+kwitansi_015_penjualan_317301.jpg,3173015706850720,PT Firmansyah Abadi,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202403-0001,2024-03-18,Ibu Siti Aminah,2,15681000
+kwitansi_016_penjualan_327501.jpg,3275010902990076,PT Wijaya Makmur,Pertanian,Distributor Hasil Tani,PENJUALAN,KJ-202402-0001,2024-02-13,Ibu Wulandari,3,15273000
+kwitansi_017_penjualan_367101.jpg,3671011009710295,UD Siregar Sejahtera,Manufaktur,Furniture,PENJUALAN,KJ-202501-0001,2025-01-16,CV Berkah Logistik,3,58891000
+kwitansi_018_penjualan_317301.jpg,3173014812731531,PT Kurniawan Sejahtera,Perdagangan,Distributor Elektronik,PENJUALAN,KJ-202506-0001,2025-06-20,Bpk. Hartono,2,7483000
+kwitansi_019_pembelian_367101.jpg,3671016012760030,PT Kusuma Makmur,Manufaktur,Konveksi,PEMBELIAN,KP-202412-0001,2024-12-09,Toko Grosir Jaya,3,14205000
+kwitansi_020_penjualan_327601.jpg,3276016206020481,CV Kusuma Mandiri,Kuliner,Warung Makan,PENJUALAN,KJ-202406-0001,2024-06-09,Ibu Ratna Dewi,2,477000
+kwitansi_021_penjualan_317201.jpg,3172010807841979,CV Susanto Jaya,Manufaktur,Konveksi,PENJUALAN,KJ-202401-0001,2024-01-20,Ibu Siti Aminah,2,5949000
+kwitansi_022_pembelian_367101.jpg,3671010101901153,UD Wibowo Jaya,Manufaktur,Furniture,PEMBELIAN,KP-202501-0001,2025-01-13,PT Distribusi Nusantara,2,92392000
+kwitansi_023_penjualan_327101.jpg,3271012605031469,CV Lubis Jaya,Pertanian,Peternakan Ayam,PENJUALAN,KJ-202508-0001,2025-08-11,CV Berkah Logistik,2,1089000
+kwitansi_024_penjualan_327601.jpg,3276010506021140,CV Tanjung Mandiri,Jasa,Laundry,PENJUALAN,KJ-202507-0001,2025-07-02,CV Berkah Logistik,2,1248000
+kwitansi_025_penjualan_317501.jpg,3175012806900658,UD Halim Sejahtera,Perdagangan,Distributor Bahan Bangunan,PENJUALAN,KJ-202501-0001,2025-01-03,Bpk. Agus Salim,3,6251000
+kwitansi_026_pembelian_317201.jpg,3172016310770134,UD Susanto Abadi,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202512-0001,2025-12-08,PT Distribusi Nusantara,2,6960000
+kwitansi_027_pembelian_317501.jpg,3175014906691903,UD Susanto Jaya,Jasa,Laundry,PEMBELIAN,KP-202401-0001,2024-01-20,Toko Grosir Jaya,3,1612000
+kwitansi_028_penjualan_327101.jpg,3271015810652307,UD Santoso Sejahtera,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202401-0001,2024-01-26,Ibu Ratna Dewi,3,12628000
+kwitansi_029_pembelian_327101.jpg,3271012608001565,PT Panjaitan Mandiri,Pertanian,Distributor Hasil Tani,PEMBELIAN,KP-202511-0001,2025-11-18,Toko Grosir Jaya,3,14352000
+kwitansi_030_pembelian_327601.jpg,3276014602900567,PT Wibowo Abadi,Perdagangan,Grosir Pakaian,PEMBELIAN,KP-202406-0001,2024-06-13,PT Distribusi Nusantara,2,17605000
+kwitansi_031_pembelian_367101.jpg,3671016304930706,CV Susanto Makmur,Pertanian,Peternakan Ayam,PEMBELIAN,KP-202504-0001,2025-04-14,PT Distribusi Nusantara,3,4105000
+kwitansi_032_pembelian_367101.jpg,3671016811871682,CV Situmorang Jaya,Jasa,Percetakan,PEMBELIAN,KP-202511-0001,2025-11-11,CV Mitra Dagang,2,1034000
+kwitansi_033_penjualan_317501.jpg,3175011505980371,PT Situmorang Jaya,Pertanian,Distributor Hasil Tani,PENJUALAN,KJ-202504-0001,2025-04-17,Toko Ritel Sejahtera,2,16494000
+kwitansi_034_pembelian_317301.jpg,3173016104810551,CV Gunawan Mandiri,Pertanian,Distributor Hasil Tani,PEMBELIAN,KP-202403-0001,2024-03-20,PT Aneka Pangan Sejahtera,3,23802000
+kwitansi_035_pembelian_327601.jpg,3276015211810843,PT Simanjuntak Abadi,Pertanian,Peternakan Ayam,PEMBELIAN,KP-202402-0001,2024-02-02,PT Aneka Pangan Sejahtera,3,11647000
+kwitansi_036_penjualan_327101.jpg,3271014612651173,UD Panjaitan Jaya,Pertanian,Distributor Hasil Tani,PENJUALAN,KJ-202401-0001,2024-01-22,Ibu Wulandari,2,642000
+kwitansi_037_pembelian_327101.jpg,3271010112950979,UD Gunawan Makmur,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202503-0001,2025-03-25,PT Distribusi Nusantara,4,46736000
+kwitansi_038_pembelian_317501.jpg,3175011106960739,CV Wijaya Sejahtera,Kuliner,Warung Makan,PEMBELIAN,KP-202402-0001,2024-02-19,UD Barokah Supplier,3,4913000
+kwitansi_039_pembelian_367401.jpg,3674015803650287,UD Santoso Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202408-0001,2024-08-12,CV Mitra Dagang,4,12278000
+kwitansi_040_penjualan_327501.jpg,3275016202670603,CV Tanjung Abadi,Perdagangan,Distributor Elektronik,PENJUALAN,KJ-202508-0001,2025-08-16,Bpk. Fajar Nugroho,3,98606000
+kwitansi_041_penjualan_367401.jpg,3674014806992653,PT Setiawan Mandiri,Manufaktur,Furniture,PENJUALAN,KJ-202502-0001,2025-02-02,Bpk. Agus Salim,2,113425000
+kwitansi_042_penjualan_367101.jpg,3671011702742660,PT Handoko Mandiri,Pertanian,Distributor Hasil Tani,PENJUALAN,KJ-202503-0001,2025-03-11,PT Sinergi Distribusi,3,10146000
+kwitansi_043_pembelian_327501.jpg,3275012306841013,UD Saputra Abadi,Pertanian,Peternakan Ayam,PEMBELIAN,KP-202401-0001,2024-01-20,UD Barokah Supplier,2,2373000
+kwitansi_044_pembelian_317401.jpg,3174015807871393,UD Permana Sejahtera,Transportasi,Rental Kendaraan,PEMBELIAN,KP-202512-0001,2025-12-09,Toko Grosir Jaya,3,87066000
+kwitansi_045_pembelian_327501.jpg,3275011701722370,PT Lubis Abadi,Kuliner,Katering,PEMBELIAN,KP-202502-0001,2025-02-08,CV Sumber Makmur,2,6595000
+kwitansi_046_pembelian_327501.jpg,3275012104941518,PT Permana Mandiri,Kuliner,Bakery,PEMBELIAN,KP-202506-0001,2025-06-10,PT Distribusi Nusantara,2,1130000
+kwitansi_047_pembelian_317301.jpg,3173010108932677,CV Situmorang Sejahtera,Jasa,Laundry,PEMBELIAN,KP-202504-0001,2025-04-29,CV Sumber Makmur,3,1175000
+kwitansi_048_penjualan_327501.jpg,3275011809022488,PT Hutapea Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202411-0001,2024-11-16,Bpk. Agus Salim,3,34372000
+kwitansi_049_pembelian_317101.jpg,3171015506962444,PT Siregar Makmur,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202412-0001,2024-12-20,PT Aneka Pangan Sejahtera,2,2538000
+kwitansi_050_pembelian_367101.jpg,3671016905951783,UD Permana Sejahtera,Transportasi,Rental Kendaraan,PEMBELIAN,KP-202411-0001,2024-11-11,UD Barokah Supplier,2,17203000

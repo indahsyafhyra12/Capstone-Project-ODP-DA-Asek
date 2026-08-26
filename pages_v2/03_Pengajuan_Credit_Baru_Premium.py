@@ -18,14 +18,35 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+from utils.agent_pipeline import _dukcapil_names, _normalize_name
 from utils.feature_builder import build_features_from_raw, load_raw_tables
+from utils.report_agent import generate_report, get_last_fallback_reason
 from utils.risk_ml_pipeline import predict_credit_screening
 from utils.ui_components import apply_logo
+from utils.ui_premium import inject_css, hero_banner
 
-st.set_page_config(page_title="Pengajuan Credit Baru", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="Pengajuan Kredit Baru", page_icon="📝", layout="wide")
 apply_logo()
-st.title("Screening Pengajuan Credit Baru")
-st.caption("Lengkapi data pengajuan di bawah untuk mendapatkan rekomendasi kelayakan kredit secara otomatis dari sistem.")
+inject_css()
+
+st.markdown("""
+<style>
+html,body,[class*="css"]{font-family:Inter,sans-serif;}
+.section-title{font-size:24px;font-weight:700;color:#1F2937;margin:26px 0 12px;}
+[data-testid="stMetricLabel"]{font-size:13px;color:#64748B;}
+[data-testid="stMetricValue"]{font-size:22px;font-weight:600;color:#1F2937;}
+</style>
+""", unsafe_allow_html=True)
+
+hero_banner(
+    "📝 Pengajuan Kredit Baru",
+    "Credit Eligibility AI • Screening UMKM menggunakan ML Pipeline (risk_ml_pipeline)."
+)
+
+c1,c2=st.columns([3,1])
+with c2:
+    st.success("🤖 ML Pipeline Active")
+
 
 
 @st.cache_data
@@ -38,8 +59,14 @@ def _load_rm_master():
     return pd.read_csv("data/raw/rm_master.csv")
 
 
+@st.cache_data
+def _load_dukcapil():
+    return pd.read_csv("data/raw/dukcapil.csv", dtype={"NIK": str})
+
+
 profile_full, slik_full, dhn_full, bank_full, fin_full = _load_raw()
 rm_master = _load_rm_master()
+dukcapil_full = _load_dukcapil()
 
 LEGAL_ENTITY_OPTIONS = sorted(profile_full["legal_entity"].unique().tolist())
 EDUCATION_OPTIONS = sorted(profile_full["owner_education"].unique().tolist())
@@ -53,6 +80,7 @@ CERTIFICATE_TYPE_OPTIONS = sorted(profile_full["certificate_type"].unique().toli
 GENDER_OPTIONS = ["L", "P"]
 YA_TIDAK_OPTIONS = ["Ya", "Tidak"]
 
+DUKCAPIL_NIKS = set(dukcapil_full["NIK"])
 KNOWN_NIKS = set(profile_full["NIK"]) | set(slik_full["NIK"]) | set(bank_full["NIK"]) | set(fin_full["NIK"])
 
 # Kolom CSV upload = persis nama kolom retail_customer_profile.csv (boleh
@@ -151,18 +179,23 @@ def screen_one_applicant(user_fields: dict, application_id: str) -> dict:
     features = build_features_from_raw([application_id], new_profile_row, slik_full, dhn_full, bank_full, fin_full)
     result = predict_credit_screening(features.iloc[0].to_dict())
 
+    company_name = user_fields.get("company_name", "")
+    alasan = generate_report({"company_name": company_name, **result})
+    fallback_reason = get_last_fallback_reason()
+
     return {
         "application_id": application_id,
-        "company_name": user_fields.get("company_name", ""),
+        "company_name": company_name,
         "NIK": nik,
         "Decision (Eligibility Recommendation)": result["decision"],
-        "Risk Score / Eligibility Score": result["risk_score"],
+        "Credit Eligibility Score": result["risk_score"],
         "Zone": result["zone"],
         "Jenis Kredit": result["jenis_kredit_rekomendasi"],
         "Nominal Disetujui": result["nominal_disetujui"],
         "Jangka Waktu (bulan)": result["jangka_waktu_bulan"],
         "Bunga (% p.a.)": result["bunga_persen"],
-        "Alasan": "",
+        "Alasan": alasan,
+        "_fallback_reason": fallback_reason,
         "_insight": result["insight"],
         "_shap": result["shap_top_factors"],
         "_is_existing_nik": nik in KNOWN_NIKS,
@@ -178,13 +211,13 @@ def _prefill_form_from_row(row: dict):
     st.session_state["_prefill_notice"] = row.get("company_name", "")
 
 
-tab_manual, tab_csv = st.tabs(["📝 Input Manual (1 Nasabah)", "📤 Upload CSV (1 atau Banyak Nasabah)"])
+tab_manual, tab_csv = st.tabs(["✍️ Input Manual", "📂 Bulk Screening CSV"])
 
 # ---------------------------------------------------------------------------
 # TAB: Upload CSV
 # ---------------------------------------------------------------------------
 with tab_csv:
-    st.subheader("Upload CSV Pengajuan")
+    st.markdown('<div class="section-title">📂 Bulk Screening CSV</div>', unsafe_allow_html=True)
     st.caption(
         "Kolom mengikuti skema `retail_customer_profile.csv`. Kolom sistem "
         "(application_id, cif_number, eligibility_score, label, dst.) tidak perlu "
@@ -235,9 +268,9 @@ with tab_csv:
                                 batch_results.append({
                                     "application_id": app_id, "company_name": row_filled.get("company_name", ""),
                                     "NIK": row_filled.get("NIK"), "Decision (Eligibility Recommendation)": "ERROR",
-                                    "Risk Score / Eligibility Score": None, "Zone": "-", "Jenis Kredit": "-",
+                                    "Credit Eligibility Score": None, "Zone": "-", "Jenis Kredit": "-",
                                     "Nominal Disetujui": None, "Jangka Waktu (bulan)": None, "Bunga (% p.a.)": None,
-                                    "Alasan": str(e), "_insight": "", "_shap": [], "_is_existing_nik": False,
+                                    "Alasan": str(e), "_fallback_reason": None, "_insight": "", "_shap": [], "_is_existing_nik": False,
                                 })
                             progress.progress((i + 1) / len(upload_df), text=f"Memproses {i + 1}/{len(upload_df)}...")
                         progress.empty()
@@ -245,16 +278,20 @@ with tab_csv:
 
     if "_batch_results" in st.session_state:
         st.divider()
-        st.subheader("Hasil Screening Batch")
+        st.markdown('<div class="section-title">📈 Hasil Batch Screening</div>', unsafe_allow_html=True)
         results_df = pd.DataFrame(st.session_state["_batch_results"])
-        display_df = results_df.drop(columns=["_insight", "_shap", "_is_existing_nik"])
+        display_df = results_df.drop(columns=["_insight", "_shap", "_is_existing_nik", "_fallback_reason"])
 
         n_error = (display_df["Decision (Eligibility Recommendation)"] == "ERROR").sum()
         n_layak = display_df["Decision (Eligibility Recommendation)"].isin(["Layak", "Layak Bersyarat"]).sum()
-        m1, m2, m3 = st.columns(3)
+        n_llm_fallback = results_df["_fallback_reason"].notna().sum()
+        m1, m2, m3, m4 = st.columns(4)
         m1.metric("Total Diproses", len(display_df))
         m2.metric("Layak / Layak Bersyarat", int(n_layak))
         m3.metric("Gagal Diproses", int(n_error))
+        m4.metric("Alasan Fallback ke Rule-Based", int(n_llm_fallback))
+        if n_llm_fallback:
+            st.caption("Baris dengan \"Alasan Fallback\" berarti narasi LLM gagal dihasilkan untuk baris itu — lihat detail di bawah.")
 
         st.dataframe(display_df, use_container_width=True, hide_index=True)
         st.download_button(
@@ -263,9 +300,11 @@ with tab_csv:
             mime="text/csv",
         )
 
-        with st.expander("Detail insight per nasabah"):
+        with st.expander("AI Insight per Nasabah"):
             for r in st.session_state["_batch_results"]:
                 st.markdown(f"**{r['application_id']} — {r['company_name']}**: {r['_insight']}")
+                if r.get("_fallback_reason"):
+                    st.caption(f"⚠️ Fallback: {r['_fallback_reason']}")
 
         if st.button("🗑️ Bersihkan hasil batch"):
             del st.session_state["_batch_results"]
@@ -285,12 +324,12 @@ with tab_manual:
         val = sv(field, default_val)
         return options.index(val) if val in options else 0
 
-    st.subheader("Industri")
+    st.markdown('<div class="section-title">🏭 Industri</div>', unsafe_allow_html=True)
     industry = st.selectbox("Industri", INDUSTRY_OPTIONS, index=sb_index(INDUSTRY_OPTIONS, "industry", INDUSTRY_OPTIONS[0]), key="f_industry")
     sub_industry_options = INDUSTRY_SUBINDUSTRY.get(industry, [])
 
     with st.form("manual_form"):
-        st.subheader("Identitas & Profil Usaha")
+        st.markdown('<div class="section-title">👤 Identitas & Profil Usaha</div>', unsafe_allow_html=True)
         c1, c2, c3 = st.columns(3)
         with c1:
             nik = st.text_input("NIK (16 digit)", value=sv("NIK", ""), max_chars=16, placeholder="3276010601750001")
@@ -325,7 +364,7 @@ with tab_manual:
             district = st.text_input("Kecamatan (lokasi usaha)", value=sv("district", ""))
         region = st.selectbox("Region", REGION_OPTIONS, index=sb_index(REGION_OPTIONS, "region", REGION_OPTIONS[0]))
 
-        st.subheader("Keuangan & Pinjaman")
+        st.markdown('<div class="section-title">💰 Profil Finansial</div>', unsafe_allow_html=True)
         c10, c11, c12 = st.columns(3)
         with c10:
             monthly_turnover_est = st.number_input("Estimasi Omset Bulanan (Rp)", min_value=1_000_000, value=int(sv("monthly_turnover_est", 50_000_000)), step=1_000_000)
@@ -336,7 +375,7 @@ with tab_manual:
         estimated_dsr = st.number_input("Estimasi DSR (Debt Service Ratio)", min_value=0.0, max_value=3.0, value=float(sv("estimated_dsr", 1.0)), step=0.1,
                                          help="Dibatasi maks 3.0 (dsr_capped) sesuai skema data training.")
 
-        st.subheader("Agunan")
+        st.markdown('<div class="section-title">🏠 Agunan & Kredit</div>', unsafe_allow_html=True)
         c13, c14, c15 = st.columns(3)
         with c13:
             collateral_type = st.selectbox("Jenis Agunan", COLLATERAL_TYPE_OPTIONS, index=sb_index(COLLATERAL_TYPE_OPTIONS, "collateral_type", COLLATERAL_TYPE_OPTIONS[0]))
@@ -357,17 +396,20 @@ with tab_manual:
         with c18:
             collateral_city = st.text_input("Kota Agunan", value=sv("collateral_city", ""))
 
-        submitted = st.form_submit_button("Jalankan Screening", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("🤖 Jalankan AI Screening", type="primary", use_container_width=True)
 
     if submitted:
-        if len(nik.strip()) != 16 or not nik.strip().isdigit():
+        nik_clean = nik.strip()
+        if len(nik_clean) != 16 or not nik_clean.isdigit():
             st.warning("NIK bukan 16 digit angka — akan otomatis ditolak oleh hard-rule identitas (Stage 1), sesuai desain sistem.")
-
-        is_existing_nik = nik.strip() in KNOWN_NIKS
-        if is_existing_nik:
-            st.info(f"NIK `{nik}` berhasil padan dengan sistem — riwayat SLIK, DHN, ATR/BPN, dan rekening/keuangan asli akan dipakai otomatis.")
+        elif nik_clean not in DUKCAPIL_NIKS:
+            st.error(f"NIK `{nik}` TIDAK terdaftar di Dukcapil — akan otomatis ditolak (hard-rule identitas, Stage 1), model ML tidak akan dipanggil.")
+        elif _normalize_name(owner_name) != _normalize_name(_dukcapil_names().get(nik_clean)):
+            st.error(f"Nama `{owner_name}` TIDAK sesuai data Dukcapil untuk NIK `{nik}`.")
+        elif nik_clean in KNOWN_NIKS:
+            st.info(f"NIK `{nik}` terverifikasi Dukcapil dan sudah dikenal sistem — riwayat SLIK/DHN/rekening/keuangan asli akan dipakai otomatis.")
         else:
-            st.info(f"NIK `{nik}` TIDAK ditemukan di sistem — riwayat SLIK/rekening/keuangan akan dipakai default netral (bukan hard-reject).")
+            st.info(f"NIK `{nik}` terverifikasi Dukcapil, tapi belum ada riwayat kredit — diproses sebagai nasabah baru dengan data netral (bukan hard-reject).")
 
         user_fields = {
             "NIK": nik.strip(), "owner_name": owner_name, "owner_age": owner_age, "owner_gender": owner_gender,
@@ -383,12 +425,19 @@ with tab_manual:
             "collateral_location": collateral_location, "collateral_province": collateral_province, "collateral_city": collateral_city,
         }
         application_id = f"SIM{datetime.now().strftime('%Y%m%d%H%M%S')}"
-        result_row = screen_one_applicant(user_fields, application_id)
+        with st.spinner("Menyusun analisis..."):
+            result_row = screen_one_applicant(user_fields, application_id)
 
         st.divider()
-        st.subheader("Hasil Screening")
+        st.markdown('<div class="section-title">📊 Hasil AI Screening</div>', unsafe_allow_html=True)
         display_row = {k: v for k, v in result_row.items() if not k.startswith("_") and k != "NIK"}
         st.dataframe(pd.DataFrame([display_row]), hide_index=True, use_container_width=True)
+
+        if result_row["_fallback_reason"]:
+            st.warning(
+                f"⚠️ Kolom \"Alasan\" di atas adalah **fallback** ke insight rule-based — narasi LLM (Gemma) "
+                f"gagal dihasilkan. Alasan teknis: `{result_row['_fallback_reason']}`"
+            )
 
         with st.expander("Insight teknis dari model (sementara, bukan kolom Alasan di atas)"):
             st.write(result_row["_insight"])
