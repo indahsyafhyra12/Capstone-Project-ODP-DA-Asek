@@ -213,6 +213,5 @@ def main():
     if n_errors:
         print(f"\nPeringatan: {n_errors} kwitansi gagal di-parse, cek kolom 'error' / 'raw_output'.")
 
-
 if __name__ == "__main__":
     main()
