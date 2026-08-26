@@ -30,11 +30,13 @@ with st.sidebar:
 
         c1, c2 = st.columns([1, 5])
         c1.markdown("🟢")
-        c2.markdown("**AI Pipeline**\n\nActive")
+        c2.markdown("**AI Pipeline**\n\ngemma-4-E2B-it")
 
         c1, c2 = st.columns([1, 5])
         c1.markdown("🤖")
-        c2.markdown("**ML Model**\n\nv1.2")
+        # c2.markdown("**ML Model**\n\nv1.2")
+        # Use ML XGBOOST
+        c2.markdown("**ML Model**\n\nXGBoost v3.4.1")
 
         c1, c2 = st.columns([1, 5])
         c1.markdown("📅")
