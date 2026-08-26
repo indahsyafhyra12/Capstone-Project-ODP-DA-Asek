@@ -61,6 +61,17 @@ CERTIFICATE_TYPE_OPTIONS = sorted(profile_full["certificate_type"].unique().toli
 GENDER_OPTIONS = ["L", "P"]
 YA_TIDAK_OPTIONS = ["Ya", "Tidak"]
 
+# Opsi utk override manual hasil screening AI (lihat run_ml_screening() /
+# utils/risk_ml_pipeline.py) - dipakai kalau RM tidak setuju dgn rekomendasi
+# model dan mau menyesuaikan sendiri sebelum hasil dianggap final.
+DECISION_OPTIONS = ["Layak", "Layak Bersyarat", "Perlu Review Ulang", "Tidak Layak"]
+ZONE_OPTIONS = ["Hijau", "Kuning", "Merah"]
+JENIS_KREDIT_OPTIONS = ["KMK", "KI", "KPR", "KKB", "KK", "-"]
+MANUAL_EDIT_FIELDS = [
+    "Decision (Eligibility Recommendation)", "Risk Score / Eligibility Score", "Zone",
+    "Jenis Kredit", "Nominal Disetujui", "Jangka Waktu (bulan)", "Bunga (% p.a.)",
+]
+
 DUKCAPIL_NIKS = set(dukcapil_full["NIK"])
 KNOWN_NIKS = set(profile_full["NIK"]) | set(slik_full["NIK"]) | set(bank_full["NIK"]) | set(fin_full["NIK"])
 
@@ -180,6 +191,7 @@ def run_ml_screening(user_fields: dict, application_id: str) -> dict:
         "_shap": result["shap_top_factors"],
         "_is_existing_nik": nik in KNOWN_NIKS,
         "_result": result,
+        "_manual_override": False,
     }
 
 
@@ -263,30 +275,89 @@ with tab_csv:
                                     "Risk Score / Eligibility Score": None, "Zone": "-", "Jenis Kredit": "-",
                                     "Nominal Disetujui": None, "Jangka Waktu (bulan)": None, "Bunga (% p.a.)": None,
                                     "Alasan": str(e), "_fallback_reason": None, "_insight": "", "_shap": [], "_is_existing_nik": False,
-                                    "_result": None,
+                                    "_result": None, "_manual_override": False,
                                 })
                             progress.progress((i + 1) / len(upload_df), text=f"Memproses {i + 1}/{len(upload_df)}...")
                         progress.empty()
                         st.session_state["_batch_results"] = batch_results
+                        st.session_state["_batch_edit_version"] = 0
 
     if "_batch_results" in st.session_state:
         st.divider()
         st.subheader("Hasil Screening Batch (ML)")
         results_df = pd.DataFrame(st.session_state["_batch_results"])
-        display_df = results_df.drop(columns=["_insight", "_shap", "_is_existing_nik", "_fallback_reason", "_result"])
+        display_df = results_df.drop(columns=["_insight", "_shap", "_is_existing_nik", "_fallback_reason", "_result", "_manual_override"])
 
         n_error = (display_df["Decision (Eligibility Recommendation)"] == "ERROR").sum()
         n_layak = display_df["Decision (Eligibility Recommendation)"].isin(["Layak", "Layak Bersyarat"]).sum()
         belum_narasi_idx = [i for i, r in enumerate(st.session_state["_batch_results"]) if r.get("_result") is not None and not r.get("Alasan")]
-        m1, m2, m3, m4 = st.columns(4)
+        n_override = sum(1 for r in st.session_state["_batch_results"] if r.get("_manual_override"))
+        m1, m2, m3, m4, m5 = st.columns(5)
         m1.metric("Total Diproses", len(display_df))
         m2.metric("Layak / Layak Bersyarat", int(n_layak))
         m3.metric("Gagal Diproses", int(n_error))
         m4.metric("Belum Ada Narasi LLM", len(belum_narasi_idx))
+        m5.metric("Diedit Manual", int(n_override))
 
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
+        st.caption(
+            "Kolom Decision/Risk Score/Zone/Jenis Kredit/Nominal/Tenor/Bunga bisa diedit langsung di tabel "
+            "kalau Anda tidak setuju dengan rekomendasi AI — baris yang diubah otomatis ditandai \"Ya\" di "
+            "kolom Diedit Manual. Klik \"💾 Simpan Perubahan Manual\" untuk menyimpan."
+        )
+        editable_df = display_df.copy()
+        editable_df["Diedit Manual"] = [
+            "Ya" if r.get("_manual_override") else "Tidak" for r in st.session_state["_batch_results"]
+        ]
+        editor_key = f"_batch_editor_{st.session_state.get('_batch_edit_version', 0)}"
+        edited_df = st.data_editor(
+            editable_df, use_container_width=True, hide_index=True, key=editor_key,
+            disabled=[c for c in editable_df.columns if c not in MANUAL_EDIT_FIELDS],
+            column_config={
+                "Decision (Eligibility Recommendation)": st.column_config.SelectboxColumn(options=DECISION_OPTIONS),
+                "Zone": st.column_config.SelectboxColumn(options=ZONE_OPTIONS),
+                "Jenis Kredit": st.column_config.SelectboxColumn(options=JENIS_KREDIT_OPTIONS),
+                "Risk Score / Eligibility Score": st.column_config.NumberColumn(min_value=0.0, max_value=1.0, step=0.01, format="%.3f"),
+                "Nominal Disetujui": st.column_config.NumberColumn(min_value=0, step=1_000_000),
+                "Jangka Waktu (bulan)": st.column_config.NumberColumn(min_value=0, step=1),
+                "Bunga (% p.a.)": st.column_config.NumberColumn(min_value=0.0, step=0.1, format="%.1f"),
+            },
+        )
+
+        ecol1, ecol2, ecol3 = st.columns(3)
+        with ecol1:
+            if st.button("💾 Simpan Perubahan Manual", type="primary", use_container_width=True):
+                updated = list(st.session_state["_batch_results"])
+                for i, row in edited_df.iterrows():
+                    orig = updated[i]
+                    if orig.get("_result") is None:
+                        continue  # baris ERROR - tidak punya hasil AI, tidak bisa dioverride
+                    changed = any(row[c] != orig.get(c) for c in MANUAL_EDIT_FIELDS)
+                    if changed:
+                        if not orig.get("_manual_override"):
+                            orig["_ai_original"] = {c: orig.get(c) for c in MANUAL_EDIT_FIELDS}
+                        for c in MANUAL_EDIT_FIELDS:
+                            orig[c] = row[c]
+                        orig["_manual_override"] = True
+                    updated[i] = orig
+                st.session_state["_batch_results"] = updated
+                st.session_state["_batch_edit_version"] = st.session_state.get("_batch_edit_version", 0) + 1
+                st.success("Perubahan manual disimpan.")
+                st.rerun()
+        with ecol2:
+            if n_override and st.button("↩️ Kembalikan Semua ke Rekomendasi AI", use_container_width=True):
+                updated = list(st.session_state["_batch_results"])
+                for i, r in enumerate(updated):
+                    if r.get("_manual_override"):
+                        r.update(r["_ai_original"])
+                        r["_manual_override"] = False
+                        del r["_ai_original"]
+                    updated[i] = r
+                st.session_state["_batch_results"] = updated
+                st.session_state["_batch_edit_version"] = st.session_state.get("_batch_edit_version", 0) + 1
+                st.rerun()
+
         st.download_button(
-            "⬇️ Download Hasil (CSV)", data=display_df.to_csv(index=False).encode("utf-8"),
+            "⬇️ Download Hasil (CSV)", data=editable_df.to_csv(index=False).encode("utf-8"),
             file_name=f"hasil_screening_batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv",
         )
@@ -314,6 +385,7 @@ with tab_csv:
 
         if st.button("🗑️ Bersihkan hasil batch"):
             del st.session_state["_batch_results"]
+            st.session_state.pop("_batch_edit_version", None)
             st.rerun()
 
 # ---------------------------------------------------------------------------
@@ -433,14 +505,82 @@ with tab_manual:
         application_id = f"SIM{datetime.now().strftime('%Y%m%d%H%M%S')}"
         with st.spinner("Menjalankan model screening (ML)..."):
             st.session_state["_manual_result"] = run_ml_screening(user_fields, application_id)
+        for k in ("_edit_decision", "_edit_zone", "_edit_risk_score", "_edit_jenis", "_edit_nominal", "_edit_tenor", "_edit_bunga"):
+            st.session_state.pop(k, None)
 
     if st.session_state.get("_manual_result"):
         result_row = st.session_state["_manual_result"]
 
         st.divider()
         st.subheader("Hasil Screening (ML) — risk_score, decision, dst.")
+        if result_row.get("_manual_override"):
+            st.caption("✏️ Hasil di bawah SUDAH diedit manual dari rekomendasi AI.")
         display_row = {k: v for k, v in result_row.items() if not k.startswith("_") and k not in ("NIK", "Alasan")}
         st.dataframe(pd.DataFrame([display_row]), hide_index=True, use_container_width=True)
+
+        with st.expander("✏️ Sesuaikan Hasil Screening (Manual Override)", expanded=False):
+            st.caption("Tidak setuju dengan rekomendasi AI? Ubah field di bawah lalu simpan — nilai AI asli tetap tersimpan dan bisa dikembalikan kapan saja.")
+            ec1, ec2, ec3 = st.columns(3)
+            with ec1:
+                edit_decision = st.selectbox(
+                    "Decision (Eligibility Recommendation)", DECISION_OPTIONS,
+                    index=DECISION_OPTIONS.index(result_row["Decision (Eligibility Recommendation)"]) if result_row["Decision (Eligibility Recommendation)"] in DECISION_OPTIONS else 0,
+                    key="_edit_decision",
+                )
+                edit_zone = st.selectbox(
+                    "Zone", ZONE_OPTIONS,
+                    index=ZONE_OPTIONS.index(result_row["Zone"]) if result_row["Zone"] in ZONE_OPTIONS else 0,
+                    key="_edit_zone",
+                )
+            with ec2:
+                edit_risk_score = st.number_input(
+                    "Risk Score / Eligibility Score", min_value=0.0, max_value=1.0, step=0.01,
+                    value=float(result_row["Risk Score / Eligibility Score"] or 0.0), key="_edit_risk_score",
+                )
+                edit_jenis = st.selectbox(
+                    "Jenis Kredit", JENIS_KREDIT_OPTIONS,
+                    index=JENIS_KREDIT_OPTIONS.index(result_row["Jenis Kredit"]) if result_row["Jenis Kredit"] in JENIS_KREDIT_OPTIONS else 0,
+                    key="_edit_jenis",
+                )
+            with ec3:
+                edit_nominal = st.number_input(
+                    "Nominal Disetujui (Rp)", min_value=0, step=1_000_000,
+                    value=int(result_row["Nominal Disetujui"] or 0), key="_edit_nominal",
+                )
+                edit_tenor = st.number_input(
+                    "Jangka Waktu (bulan)", min_value=0, step=1,
+                    value=int(result_row["Jangka Waktu (bulan)"] or 0), key="_edit_tenor",
+                )
+                edit_bunga = st.number_input(
+                    "Bunga (% p.a.)", min_value=0.0, step=0.1,
+                    value=float(result_row["Bunga (% p.a.)"] or 0.0), key="_edit_bunga",
+                )
+
+            bcol1, bcol2 = st.columns(2)
+            with bcol1:
+                if st.button("💾 Simpan Perubahan Manual", type="primary", use_container_width=True):
+                    if not result_row.get("_manual_override"):
+                        result_row["_ai_original"] = {c: result_row[c] for c in MANUAL_EDIT_FIELDS}
+                    result_row["Decision (Eligibility Recommendation)"] = edit_decision
+                    result_row["Zone"] = edit_zone
+                    result_row["Risk Score / Eligibility Score"] = edit_risk_score
+                    result_row["Jenis Kredit"] = edit_jenis
+                    result_row["Nominal Disetujui"] = edit_nominal
+                    result_row["Jangka Waktu (bulan)"] = edit_tenor
+                    result_row["Bunga (% p.a.)"] = edit_bunga
+                    result_row["_manual_override"] = True
+                    st.session_state["_manual_result"] = result_row
+                    st.success("Perubahan manual disimpan.")
+                    st.rerun()
+            with bcol2:
+                if result_row.get("_manual_override") and st.button("↩️ Kembalikan ke Rekomendasi AI", use_container_width=True):
+                    result_row.update(result_row["_ai_original"])
+                    result_row["_manual_override"] = False
+                    del result_row["_ai_original"]
+                    st.session_state["_manual_result"] = result_row
+                    for k in ("_edit_decision", "_edit_zone", "_edit_risk_score", "_edit_jenis", "_edit_nominal", "_edit_tenor", "_edit_bunga"):
+                        st.session_state.pop(k, None)
+                    st.rerun()
 
         with st.expander("Insight teknis dari model (rule-based, tersedia instan)"):
             st.write(result_row["_insight"])
