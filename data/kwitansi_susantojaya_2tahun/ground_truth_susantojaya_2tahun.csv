@@ -1,0 +1,97 @@
+file_name,nik,nama_usaha,industri,sub_industri,jenis_kwitansi,no_kwitansi,tanggal,tahun,bulan,pihak_lain,jumlah_item,total_amount
+kwitansi_001_202401_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202401-0001,2024-01-24,2024,1,Toko Bangunan Makmur,3,12815000
+kwitansi_002_202401_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202401-0002,2024-01-06,2024,1,CV Aneka Jaya,3,14414000
+kwitansi_003_202401_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202401-0001,2024-01-17,2024,1,Bengkel Truk Jaya Motor,3,37344000
+kwitansi_004_202401_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202401-0002,2024-01-14,2024,1,SPBU Pertamina 34.123.45,4,37107000
+kwitansi_005_202402_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202402-0001,2024-02-12,2024,2,PT Sumber Rejeki,2,16175436
+kwitansi_006_202402_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202402-0002,2024-02-07,2024,2,CV Aneka Jaya,3,3843584
+kwitansi_007_202402_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202402-0001,2024-02-11,2024,2,Bengkel Truk Jaya Motor,2,2994866
+kwitansi_008_202402_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202402-0002,2024-02-08,2024,2,Toko Spare Part Sumber Baru,2,2545136
+kwitansi_009_202403_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202403-0001,2024-03-14,2024,3,PT Cipta Boga Nusantara,2,15501855
+kwitansi_010_202403_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202403-0002,2024-03-13,2024,3,CV Aneka Jaya,3,47525670
+kwitansi_011_202403_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202403-0001,2024-03-04,2024,3,Bengkel Mitra Truk,4,55419840
+kwitansi_012_202403_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202403-0002,2024-03-26,2024,3,Toko Spare Part Sumber Baru,4,44289057
+kwitansi_013_202404_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202404-0001,2024-04-15,2024,4,Toko Bangunan Makmur,4,21572784
+kwitansi_014_202404_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202404-0002,2024-04-18,2024,4,Ibu Ratna (Online Shop),3,9975476
+kwitansi_015_202404_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202404-0001,2024-04-05,2024,4,Bengkel Mitra Truk,3,20747816
+kwitansi_016_202404_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202404-0002,2024-04-16,2024,4,Bengkel Truk Jaya Motor,2,15327158
+kwitansi_017_202405_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202405-0001,2024-05-18,2024,5,Toko Elektronik Makmur,2,7247854
+kwitansi_018_202405_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202405-0002,2024-05-16,2024,5,PT Sinergi Distribusi,4,22753496
+kwitansi_019_202405_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202405-0001,2024-05-13,2024,5,SPBU Pertamina 34.123.45,4,28163946
+kwitansi_020_202405_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202405-0002,2024-05-22,2024,5,Toko Spare Part Sumber Baru,3,24540032
+kwitansi_021_202406_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202406-0001,2024-06-08,2024,6,PT Cipta Boga Nusantara,4,38503409
+kwitansi_022_202406_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202406-0002,2024-06-19,2024,6,Toko Bangunan Makmur,2,11008347
+kwitansi_023_202406_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202406-0001,2024-06-16,2024,6,Bengkel Mitra Truk,2,14218328
+kwitansi_024_202406_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202406-0002,2024-06-26,2024,6,Bengkel Mitra Truk,4,15480535
+kwitansi_025_202407_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202407-0001,2024-07-26,2024,7,PT Sinergi Distribusi,4,34138148
+kwitansi_026_202407_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202407-0002,2024-07-12,2024,7,Toko Bangunan Makmur,3,34651078
+kwitansi_027_202407_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202407-0001,2024-07-18,2024,7,Bengkel Truk Jaya Motor,3,4456864
+kwitansi_028_202407_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202407-0002,2024-07-21,2024,7,Toko Spare Part Sumber Baru,4,63849956
+kwitansi_029_202408_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202408-0001,2024-08-20,2024,8,Ibu Ratna (Online Shop),2,12896505
+kwitansi_030_202408_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202408-0002,2024-08-14,2024,8,CV Aneka Jaya,2,7077288
+kwitansi_031_202408_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202408-0001,2024-08-02,2024,8,Bengkel Mitra Truk,3,10520772
+kwitansi_032_202408_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202408-0002,2024-08-05,2024,8,Toko Spare Part Sumber Baru,4,17837087
+kwitansi_033_202409_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202409-0001,2024-09-24,2024,9,Toko Elektronik Makmur,3,19745957
+kwitansi_034_202409_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202409-0002,2024-09-21,2024,9,CV Berkah Logistik,3,12583616
+kwitansi_035_202409_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202409-0001,2024-09-11,2024,9,CV Ban Sejahtera,3,16418854
+kwitansi_036_202409_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202409-0002,2024-09-24,2024,9,Toko Spare Part Sumber Baru,2,975903
+kwitansi_037_202410_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202410-0001,2024-10-09,2024,10,PT Sumber Rejeki,3,18835923
+kwitansi_038_202410_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202410-0002,2024-10-01,2024,10,CV Aneka Jaya,4,38937297
+kwitansi_039_202410_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202410-0001,2024-10-07,2024,10,Bengkel Truk Jaya Motor,3,43935405
+kwitansi_040_202410_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202410-0002,2024-10-01,2024,10,Toko Spare Part Sumber Baru,4,34256474
+kwitansi_041_202411_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202411-0001,2024-11-09,2024,11,CV Berkah Logistik,3,11541299
+kwitansi_042_202411_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202411-0002,2024-11-03,2024,11,PT Sumber Rejeki,2,36939807
+kwitansi_043_202411_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202411-0001,2024-11-15,2024,11,Bengkel Truk Jaya Motor,3,17776885
+kwitansi_044_202411_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202411-0002,2024-11-27,2024,11,SPBU Pertamina 34.123.45,4,10714043
+kwitansi_045_202412_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202412-0001,2024-12-27,2024,12,Ibu Ratna (Online Shop),3,16979696
+kwitansi_046_202412_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202412-0002,2024-12-01,2024,12,CV Berkah Logistik,2,5736534
+kwitansi_047_202412_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202412-0001,2024-12-12,2024,12,CV Ban Sejahtera,2,13616431
+kwitansi_048_202412_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202412-0002,2024-12-13,2024,12,Bengkel Mitra Truk,3,19309801
+kwitansi_049_202501_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202501-0001,2025-01-06,2025,1,Ibu Ratna (Online Shop),3,20113793
+kwitansi_050_202501_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202501-0002,2025-01-21,2025,1,Toko Bangunan Makmur,4,37475679
+kwitansi_051_202501_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202501-0001,2025-01-16,2025,1,Bengkel Mitra Truk,4,87188949
+kwitansi_052_202501_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202501-0002,2025-01-01,2025,1,CV Ban Sejahtera,2,19524846
+kwitansi_053_202502_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202502-0001,2025-02-24,2025,2,Ibu Ratna (Online Shop),2,474332
+kwitansi_054_202502_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202502-0002,2025-02-17,2025,2,PT Sinergi Distribusi,2,11194860
+kwitansi_055_202502_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202502-0001,2025-02-27,2025,2,Bengkel Truk Jaya Motor,2,36373152
+kwitansi_056_202502_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202502-0002,2025-02-16,2025,2,CV Ban Sejahtera,2,22026803
+kwitansi_057_202503_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202503-0001,2025-03-09,2025,3,CV Aneka Jaya,3,33686185
+kwitansi_058_202503_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202503-0002,2025-03-28,2025,3,CV Aneka Jaya,4,16289933
+kwitansi_059_202503_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202503-0001,2025-03-26,2025,3,SPBU Pertamina 34.123.45,4,25371958
+kwitansi_060_202503_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202503-0002,2025-03-14,2025,3,SPBU Pertamina 34.123.45,3,31592460
+kwitansi_061_202504_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202504-0001,2025-04-15,2025,4,PT Cipta Boga Nusantara,3,32442040
+kwitansi_062_202504_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202504-0002,2025-04-01,2025,4,Toko Elektronik Makmur,4,26422338
+kwitansi_063_202504_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202504-0001,2025-04-07,2025,4,Bengkel Mitra Truk,3,58984741
+kwitansi_064_202504_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202504-0002,2025-04-14,2025,4,Bengkel Truk Jaya Motor,4,20535218
+kwitansi_065_202505_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202505-0001,2025-05-27,2025,5,PT Sinergi Distribusi,2,2945774
+kwitansi_066_202505_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202505-0002,2025-05-03,2025,5,CV Berkah Logistik,4,26093126
+kwitansi_067_202505_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202505-0001,2025-05-17,2025,5,Toko Spare Part Sumber Baru,4,28460708
+kwitansi_068_202505_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202505-0002,2025-05-17,2025,5,Bengkel Mitra Truk,3,42539367
+kwitansi_069_202506_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202506-0001,2025-06-25,2025,6,Toko Bangunan Makmur,4,19761485
+kwitansi_070_202506_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202506-0002,2025-06-14,2025,6,PT Cipta Boga Nusantara,4,15700947
+kwitansi_071_202506_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202506-0001,2025-06-04,2025,6,Bengkel Truk Jaya Motor,4,24283996
+kwitansi_072_202506_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202506-0002,2025-06-03,2025,6,SPBU Pertamina 34.123.45,4,43956137
+kwitansi_073_202507_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202507-0001,2025-07-03,2025,7,Toko Elektronik Makmur,3,11554347
+kwitansi_074_202507_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202507-0002,2025-07-12,2025,7,Toko Bangunan Makmur,4,27060418
+kwitansi_075_202507_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202507-0001,2025-07-15,2025,7,Bengkel Mitra Truk,2,5910945
+kwitansi_076_202507_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202507-0002,2025-07-25,2025,7,Bengkel Mitra Truk,3,11228228
+kwitansi_077_202508_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202508-0001,2025-08-08,2025,8,PT Sumber Rejeki,2,18227010
+kwitansi_078_202508_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202508-0002,2025-08-15,2025,8,PT Sinergi Distribusi,2,14890722
+kwitansi_079_202508_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202508-0001,2025-08-28,2025,8,SPBU Pertamina 34.123.45,4,80811680
+kwitansi_080_202508_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202508-0002,2025-08-05,2025,8,SPBU Pertamina 34.123.45,4,21717925
+kwitansi_081_202509_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202509-0001,2025-09-21,2025,9,CV Berkah Logistik,2,2034760
+kwitansi_082_202509_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202509-0002,2025-09-26,2025,9,PT Sinergi Distribusi,3,19316077
+kwitansi_083_202509_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202509-0001,2025-09-28,2025,9,CV Ban Sejahtera,4,21667800
+kwitansi_084_202509_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202509-0002,2025-09-23,2025,9,Bengkel Mitra Truk,3,73342149
+kwitansi_085_202510_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202510-0001,2025-10-21,2025,10,Toko Bangunan Makmur,4,73196253
+kwitansi_086_202510_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202510-0002,2025-10-10,2025,10,PT Cipta Boga Nusantara,2,9287083
+kwitansi_087_202510_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202510-0001,2025-10-02,2025,10,SPBU Pertamina 34.123.45,3,13984745
+kwitansi_088_202510_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202510-0002,2025-10-03,2025,10,Bengkel Mitra Truk,4,16088100
+kwitansi_089_202511_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202511-0001,2025-11-09,2025,11,Toko Bangunan Makmur,2,22819400
+kwitansi_090_202511_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202511-0002,2025-11-17,2025,11,PT Cipta Boga Nusantara,4,64814340
+kwitansi_091_202511_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202511-0001,2025-11-15,2025,11,Bengkel Mitra Truk,3,36627735
+kwitansi_092_202511_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202511-0002,2025-11-08,2025,11,Bengkel Mitra Truk,2,5209627
+kwitansi_093_202512_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202512-0001,2025-12-07,2025,12,PT Sinergi Distribusi,2,10069650
+kwitansi_094_202512_penjualan.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PENJUALAN,KJ-202512-0002,2025-12-04,2025,12,Toko Elektronik Makmur,2,21273300
+kwitansi_095_202512_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202512-0001,2025-12-13,2025,12,SPBU Pertamina 34.123.45,2,42439950
+kwitansi_096_202512_pembelian.jpg,3275016008853000,UD Susanto Jaya,Transportasi,Ekspedisi Kecil,PEMBELIAN,KP-202512-0002,2025-12-16,2025,12,CV Ban Sejahtera,2,16690050
