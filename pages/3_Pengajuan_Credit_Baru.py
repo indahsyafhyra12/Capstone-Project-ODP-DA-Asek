@@ -128,10 +128,12 @@ def _build_csv_template() -> bytes:
     return template_df.to_csv(index=False).encode("utf-8")
 
 
-def screen_one_applicant(user_fields: dict, application_id: str) -> dict:
-    """Satu implementasi dipakai baik utk submit form manual maupun tiap
-    baris di batch CSV - system-fill field non-user, build fitur dari raw
-    tables, jalankan predict_credit_screening()."""
+def run_ml_screening(user_fields: dict, application_id: str) -> dict:
+    """Bagian CEPAT (ML only) - system-fill field non-user, build fitur dari
+    raw tables, jalankan predict_credit_screening(). TIDAK memanggil LLM,
+    jadi risk_score/decision bisa langsung dilihat tanpa menunggu narasi.
+    Narasi "Alasan" diisi lewat run_llm_narrative() secara terpisah, dipicu
+    tombol lain."""
     nik = str(user_fields["NIK"]).strip()
     existing_cif = profile_full.loc[profile_full["NIK"] == nik, "cif_number"]
     cif_number = existing_cif.iloc[0] if len(existing_cif) else f"CIF-SIM-{nik[-6:] if len(nik) >= 6 else nik}"
@@ -161,9 +163,6 @@ def screen_one_applicant(user_fields: dict, application_id: str) -> dict:
     result = predict_credit_screening(features.iloc[0].to_dict())
 
     company_name = user_fields.get("company_name", "")
-    alasan = generate_report({"company_name": company_name, **result})
-    fallback_reason = get_last_fallback_reason()
-
     return {
         "application_id": application_id,
         "company_name": company_name,
@@ -175,12 +174,24 @@ def screen_one_applicant(user_fields: dict, application_id: str) -> dict:
         "Nominal Disetujui": result["nominal_disetujui"],
         "Jangka Waktu (bulan)": result["jangka_waktu_bulan"],
         "Bunga (% p.a.)": result["bunga_persen"],
-        "Alasan": alasan,
-        "_fallback_reason": fallback_reason,
+        "Alasan": None,
+        "_fallback_reason": None,
         "_insight": result["insight"],
         "_shap": result["shap_top_factors"],
         "_is_existing_nik": nik in KNOWN_NIKS,
+        "_result": result,
     }
+
+
+def run_llm_narrative(row: dict) -> dict:
+    """Bagian LAMBAT (LLM) - isi kolom "Alasan" dari row hasil
+    run_ml_screening() (butuh key "_result" mentah dari predict_credit_screening).
+    Dipanggil terpisah lewat tombol sendiri supaya risk_score bisa dilihat
+    duluan tanpa menunggu ini."""
+    row = dict(row)
+    row["Alasan"] = generate_report({"company_name": row["company_name"], **row["_result"]})
+    row["_fallback_reason"] = get_last_fallback_reason()
+    return row
 
 
 def _prefill_form_from_row(row: dict):
@@ -237,14 +248,14 @@ with tab_csv:
                         st.rerun()
                 else:
                     st.info(f"CSV berisi {len(upload_df)} pengajuan — akan diproses langsung sebagai batch (tanpa form individual).")
-                    if st.button(f"🚀 Jalankan Screening untuk {len(upload_df)} Nasabah", type="primary"):
+                    if st.button(f"🔍 Jalankan Screening ML untuk {len(upload_df)} Nasabah", type="primary"):
                         progress = st.progress(0.0, text="Memproses...")
                         batch_results = []
                         for i, (_, row) in enumerate(upload_df.iterrows()):
                             row_filled = _apply_defaults(row.to_dict())
                             app_id = f"SIM{datetime.now().strftime('%Y%m%d%H%M%S')}{i:03d}"
                             try:
-                                batch_results.append(screen_one_applicant(row_filled, app_id))
+                                batch_results.append(run_ml_screening(row_filled, app_id))
                             except Exception as e:
                                 batch_results.append({
                                     "application_id": app_id, "company_name": row_filled.get("company_name", ""),
@@ -252,6 +263,7 @@ with tab_csv:
                                     "Risk Score / Eligibility Score": None, "Zone": "-", "Jenis Kredit": "-",
                                     "Nominal Disetujui": None, "Jangka Waktu (bulan)": None, "Bunga (% p.a.)": None,
                                     "Alasan": str(e), "_fallback_reason": None, "_insight": "", "_shap": [], "_is_existing_nik": False,
+                                    "_result": None,
                                 })
                             progress.progress((i + 1) / len(upload_df), text=f"Memproses {i + 1}/{len(upload_df)}...")
                         progress.empty()
@@ -259,20 +271,18 @@ with tab_csv:
 
     if "_batch_results" in st.session_state:
         st.divider()
-        st.subheader("Hasil Screening Batch")
+        st.subheader("Hasil Screening Batch (ML)")
         results_df = pd.DataFrame(st.session_state["_batch_results"])
-        display_df = results_df.drop(columns=["_insight", "_shap", "_is_existing_nik", "_fallback_reason"])
+        display_df = results_df.drop(columns=["_insight", "_shap", "_is_existing_nik", "_fallback_reason", "_result"])
 
         n_error = (display_df["Decision (Eligibility Recommendation)"] == "ERROR").sum()
         n_layak = display_df["Decision (Eligibility Recommendation)"].isin(["Layak", "Layak Bersyarat"]).sum()
-        n_llm_fallback = results_df["_fallback_reason"].notna().sum()
+        belum_narasi_idx = [i for i, r in enumerate(st.session_state["_batch_results"]) if r.get("_result") is not None and not r.get("Alasan")]
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Total Diproses", len(display_df))
         m2.metric("Layak / Layak Bersyarat", int(n_layak))
         m3.metric("Gagal Diproses", int(n_error))
-        m4.metric("Alasan Fallback ke Rule-Based", int(n_llm_fallback))
-        if n_llm_fallback:
-            st.caption("Baris dengan \"Alasan Fallback\" berarti narasi LLM gagal dihasilkan untuk baris itu — lihat detail di bawah.")
+        m4.metric("Belum Ada Narasi LLM", len(belum_narasi_idx))
 
         st.dataframe(display_df, use_container_width=True, hide_index=True)
         st.download_button(
@@ -281,9 +291,24 @@ with tab_csv:
             mime="text/csv",
         )
 
-        with st.expander("Detail insight per nasabah"):
+        if belum_narasi_idx:
+            if st.button(f"🤖 Generate Narasi (LLM) untuk {len(belum_narasi_idx)} Nasabah"):
+                progress = st.progress(0.0, text="Menyusun narasi...")
+                updated = list(st.session_state["_batch_results"])
+                for done, i in enumerate(belum_narasi_idx):
+                    updated[i] = run_llm_narrative(updated[i])
+                    progress.progress((done + 1) / len(belum_narasi_idx), text=f"Menyusun narasi {done + 1}/{len(belum_narasi_idx)}...")
+                progress.empty()
+                st.session_state["_batch_results"] = updated
+                st.rerun()
+
+        n_llm_fallback = sum(1 for r in st.session_state["_batch_results"] if r.get("_fallback_reason"))
+        if n_llm_fallback:
+            st.caption(f"{n_llm_fallback} baris fallback ke narasi rule-based (LLM gagal) — lihat detail di bawah.")
+
+        with st.expander("Detail insight & narasi per nasabah"):
             for r in st.session_state["_batch_results"]:
-                st.markdown(f"**{r['application_id']} — {r['company_name']}**: {r['_insight']}")
+                st.markdown(f"**{r['application_id']} — {r['company_name']}**: {r.get('Alasan') or r['_insight']}")
                 if r.get("_fallback_reason"):
                     st.caption(f"⚠️ Fallback: {r['_fallback_reason']}")
 
@@ -377,7 +402,7 @@ with tab_manual:
         with c18:
             collateral_city = st.text_input("Kota Agunan", value=sv("collateral_city", ""))
 
-        submitted = st.form_submit_button("Jalankan Screening", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("🔍 Jalankan Screening (ML)", type="primary", use_container_width=True)
 
     if submitted:
         nik_clean = nik.strip()
@@ -406,22 +431,35 @@ with tab_manual:
             "collateral_location": collateral_location, "collateral_province": collateral_province, "collateral_city": collateral_city,
         }
         application_id = f"SIM{datetime.now().strftime('%Y%m%d%H%M%S')}"
-        with st.spinner("Menyusun analisis..."):
-            result_row = screen_one_applicant(user_fields, application_id)
+        with st.spinner("Menjalankan model screening (ML)..."):
+            st.session_state["_manual_result"] = run_ml_screening(user_fields, application_id)
+
+    if st.session_state.get("_manual_result"):
+        result_row = st.session_state["_manual_result"]
 
         st.divider()
-        st.subheader("Hasil Screening")
-        display_row = {k: v for k, v in result_row.items() if not k.startswith("_") and k != "NIK"}
+        st.subheader("Hasil Screening (ML) — risk_score, decision, dst.")
+        display_row = {k: v for k, v in result_row.items() if not k.startswith("_") and k not in ("NIK", "Alasan")}
         st.dataframe(pd.DataFrame([display_row]), hide_index=True, use_container_width=True)
 
-        if result_row["_fallback_reason"]:
-            st.warning(
-                f"⚠️ Kolom \"Alasan\" di atas adalah **fallback** ke insight rule-based — narasi LLM (Gemma) "
-                f"gagal dihasilkan. Alasan teknis: `{result_row['_fallback_reason']}`"
-            )
-
-        with st.expander("Insight teknis dari model (sementara, bukan kolom Alasan di atas)"):
+        with st.expander("Insight teknis dari model (rule-based, tersedia instan)"):
             st.write(result_row["_insight"])
             if result_row["_shap"]:
                 st.caption("Faktor paling berpengaruh terhadap skor (SHAP):")
                 st.dataframe(pd.DataFrame(result_row["_shap"]), hide_index=True, use_container_width=True)
+
+        st.divider()
+        st.subheader("Narasi (LLM)")
+        if result_row.get("Alasan"):
+            st.write(result_row["Alasan"])
+            if result_row.get("_fallback_reason"):
+                st.warning(
+                    f"⚠️ Narasi di atas adalah **fallback** ke insight rule-based — narasi LLM (Gemma) "
+                    f"gagal dihasilkan. Alasan teknis: `{result_row['_fallback_reason']}`"
+                )
+        else:
+            st.caption("Belum digenerate — klik tombol di bawah kalau perlu narasi natural untuk laporan (opsional, risk_score di atas sudah final).")
+            if st.button("🤖 Generate Narasi (LLM)"):
+                with st.spinner("Menyusun narasi dengan LLM..."):
+                    st.session_state["_manual_result"] = run_llm_narrative(result_row)
+                st.rerun()
