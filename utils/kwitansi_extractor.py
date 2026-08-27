@@ -136,6 +136,9 @@ def extract_one(image_path: Path, model, processor, device, dtype) -> dict:
     output_ids = model.generate(**inputs, max_new_tokens=512)
     generated_ids = output_ids[0, inputs["input_ids"].shape[1]:]
     raw_text = processor.decode(generated_ids, skip_special_tokens=True).strip()
+    print("\n===== RAW_TEXT OCR START =====")
+    print(raw_text)
+    print("===== RAW_TEXT OCR END =====\n")
     log_variable("raw_text", raw_text)
 
     parsed = _parse_receipt_text(raw_text)
