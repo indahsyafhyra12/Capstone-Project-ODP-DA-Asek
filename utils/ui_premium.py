@@ -1,134 +1,418 @@
 import streamlit as st
+import streamlit.components.v1 as components
 
-# ===== BNI Design System =====
-BNI_ORANGE = "#F36F21"
-BNI_TEAL = "#00A3AD"
-BG = "#F8FAFC"
-BORDER = "#E5E7EB"
-TEXT = "#1F2937"
+# ==========================================================
+# WONDR COLOR PALETTE
+# ==========================================================
+# Dipakai buat chart NON-zone (industri, RM performance, trend, dsb).
+# Sengaja cuma 4 family ini (bukan semua 6) — Green & Yellow wondr
+# sengaja di-exclude karena mirip warna zone-status (hijau/kuning
+# risk), biar ga ketuker maknanya sama chart zone yang pakai
+# traffic-light merah/kuning/oranye/hijau.
+WONDR_COLORS = {
+    "orange":    {"highlight": "#FEEBDD", "core": "#FF8736", "shadow1": "#F3650B", "shadow2": "#C64827"},
+    "turquoise": {"highlight": "#D9F4F1", "core": "#71D8D3", "shadow1": "#52B5AB", "shadow2": "#44A095"},
+    "pink":      {"highlight": "#FDE1FF", "core": "#FDA9FF", "shadow1": "#D279D7", "shadow2": "#AB59B2"},
+    "purple":    {"highlight": "#E7E3FF", "core": "#9B7EDC", "shadow1": "#7863C6", "shadow2": "#5B4A99"},
+}
 
-SUCCESS = "#16A34A"
-WARNING = "#F59E0B"
-DANGER = "#DC2626"
+# Urutan "core" tone buat dipakai langsung sebagai list warna di
+# Plotly/matplotlib kalau butuh palet kategorikal cepat, misal:
+# fig = px.bar(df, x=..., y=..., color=..., color_discrete_sequence=WONDR_CATEGORICAL)
+WONDR_CATEGORICAL = [
+    WONDR_COLORS["orange"]["core"],
+    WONDR_COLORS["turquoise"]["core"],
+    WONDR_COLORS["pink"]["core"],
+    WONDR_COLORS["purple"]["core"],
+]
+
+# Zone-status tetap terpisah, JANGAN diganti pakai wondr palette.
+ZONE_COLORS = {
+    "layak": "#22C55E",
+    "layak_bersyarat": "#EAB308",
+    "perlu_review": "#F97316",
+    "tidak_layak": "#EF4444",
+}
 
 
+# ==========================================================
+# GLOBAL CSS
+# ==========================================================
 def inject_css():
-    st.markdown(f"""
+
+    st.markdown("""
     <style>
-    .block-container {{
-        padding-top: 1.8rem;
-        max-width: 1450px;
-    }}
 
-    [data-testid="stSidebar"] {{
-        background: {BG};
-        border-right:1px solid {BORDER};
-    }}
+    /* ======================================================
+       GLOBAL
+    ====================================================== */
 
-    .hero {{
-        background: linear-gradient(135deg,{BNI_ORANGE},#FF8A3D);
-        border-radius:22px;
-        padding:28px;
-        color:white;
-        margin-bottom:22px;
-    }}
+    .block-container{
+        padding-top:1.2rem;
+        padding-bottom:2rem;
+        font-family:'Inter','Segoe UI',sans-serif;
+    }
 
-    .hero h1 {{
-        margin:0;
-        font-size:42px;
-        font-weight:800;
-    }}
+    html, body, [class*="css"]{
+        font-family:'Inter','Segoe UI',sans-serif;
+    }
 
-    .hero p {{
-        margin-top:8px;
-        font-size:16px;
-        opacity:.95;
-    }}
+    /* ======================================================
+       SIDEBAR — SHELL
+    ====================================================== */
 
-    .metric-card {{
+    section[data-testid="stSidebar"]{
+        background:#F8FAFC;
+        border-right:1px solid #E5E7EB;
+    }
+
+    /* Streamlit membungkus tiap block markdown/nav dalam
+       container yang punya gap default. Ini matiin gap itu
+       khusus di sidebar biar spacing sepenuhnya dikontrol
+       CSS custom di bawah, bukan flex-gap bawaan Streamlit. */
+    section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"]{
+        gap:0 !important;
+    }
+
+    /* ======================================================
+       SIDEBAR — NAV LIST
+       (fix utama: <ul>/<li> bawaan Streamlit punya margin/padding
+       sendiri yang bikin jarak antar menu kelihatan renggang)
+    ====================================================== */
+
+    section[data-testid="stSidebarNav"]{
+        padding-top:.5rem;
+    }
+
+    section[data-testid="stSidebarNav"] ul{
+        gap:0 !important;
+        margin:0 !important;
+        padding:0 !important;
+    }
+
+    section[data-testid="stSidebarNav"] li{
+        margin:0 !important;
+        padding:0 !important;
+    }
+
+    section[data-testid="stSidebarNav"] li div{
+        margin:0 !important;
+    }
+
+    section[data-testid="stSidebarNav"] a{
+        border-radius:12px;
+        margin:2px 10px;
+        padding:9px 12px;
+        display:flex;
+        align-items:center;
+        gap:10px;
+        font-weight:500;
+        transition:.15s;
+    }
+
+    section[data-testid="stSidebarNav"] a:hover{
+        background:#F3F4F6;
+    }
+
+    section[data-testid="stSidebar"] [aria-current="page"]{
+        background:#EEF2F7;
+        font-weight:700;
+    }
+
+    .sidebar-divider{
+        border-top:1px solid #E5E7EB;
+        margin:16px 0 0 0;
+    }
+
+    /* ======================================================
+       SYSTEM STATUS CARD
+    ====================================================== */
+
+    .status-card{
         background:white;
-        border:1px solid {BORDER};
+        border:1px solid #E5E7EB;
         border-radius:18px;
         padding:18px;
-        box-shadow:0 3px 12px rgba(0,0,0,.05);
-    }}
+        margin-top:16px;
+    }
 
-    .metric-label {{
-        color:#6B7280;
-        font-size:13px;
-    }}
-
-    .metric-value {{
-        font-size:30px;
+    .status-title{
+        font-size:15px;
         font-weight:700;
-        color:{TEXT};
-    }}
+        color:#1F2937;
+        margin-bottom:14px;
+    }
 
-    .section-card {{
+    .status-item{
+        display:flex;
+        align-items:flex-start;
+        gap:10px;
+        margin-bottom:12px;
+    }
+
+    .status-icon{
+        font-size:16px;
+        width:20px;
+    }
+
+    .status-label{
+        font-size:12px;
+        font-weight:600;
+        color:#374151;
+    }
+
+    .status-value{
+        font-size:12px;
+        color:#6B7280;
+        margin-top:1px;
+        white-space:nowrap;
+    }
+
+    /* ======================================================
+       QUICK ACTIONS PANEL
+    ====================================================== */
+
+    .quick-actions-card{
         background:white;
-        border:1px solid {BORDER};
+        border:1px solid #E5E7EB;
         border-radius:18px;
+        padding:16px;
+        margin-top:16px;
+    }
+
+    .quick-actions-title{
+        font-size:15px;
+        font-weight:700;
+        color:#1F2937;
+        margin-bottom:12px;
+        display:flex;
+        align-items:center;
+        gap:6px;
+    }
+
+    .quick-action-btn{
+        display:flex;
+        align-items:center;
+        gap:10px;
+        border:1px solid #E5E7EB;
+        border-radius:12px;
+        padding:10px 12px;
+        margin-bottom:8px;
+        color:#9CA3AF;
+        font-size:13px;
+        font-weight:500;
+    }
+
+    .quick-action-btn:last-child{
+        margin-bottom:0;
+    }
+
+    /* ======================================================
+       KPI / METRIC CARD — kotak jelas, bukan flat/transparan
+    ====================================================== */
+
+    .kpi-card{
+        background:white;
+        border:1px solid #D1D5DB;
+        border-radius:14px;
+        padding:16px;
+    }
+
+    .kpi-label{
+        font-size:12px;
+        color:#6B7280;
+        white-space:nowrap;
+    }
+
+    .kpi-value{
+        font-size:24px;
+        font-weight:700;
+        color:#111827;
+        margin-top:4px;
+    }
+
+    /* ======================================================
+       SECTION CARD
+    ====================================================== */
+
+    .section-card{
+        background:white;
+        border:1px solid #D1D5DB;
+        border-radius:14px;
         padding:20px;
-        margin-bottom:18px;
-    }}
+        margin-bottom:20px;
+    }
 
-    div[data-testid="stDataFrame"] {{
-        border-radius:16px;
-        overflow:hidden;
-    }}
+    .section-title{
+        font-size:16px;
+        font-weight:700;
+        color:#1F2937;
+        margin-bottom:14px;
+    }
 
-    div[data-testid="stPlotlyChart"] {{
-        border-radius:16px;
-    }}
+    /* ======================================================
+       SECTION HEADER — pembatas antar section (bukan st.markdown('##..'),
+       itu defaultnya kegedean, ~28px). Ini dipanggil lewat section_header().
+    ====================================================== */
+
+    .section-header{
+        display:flex;
+        align-items:center;
+        gap:8px;
+        margin:6px 0 14px 0;
+        padding-top:18px;
+        border-top:2px solid #E5E7EB;
+    }
+
+    .section-header-icon{
+        width:26px;
+        height:26px;
+        border-radius:7px;
+        background:#F3F4F6;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:13px;
+        flex-shrink:0;
+    }
+
+    .section-header-title{
+        font-size:15px;
+        font-weight:700;
+        color:#1F2937;
+    }
+
+    /* ======================================================
+       CHART TITLE — pengganti st.markdown('#### ...') di dalam
+       tiap card chart. Default h4 Streamlit itu ~28px, kegedean
+       dibanding section-header-title (15px) yg jadi induknya.
+    ====================================================== */
+
+    .chart-title{
+        font-size:12px;
+        font-weight:600;
+        color:#4B5563;
+        margin-bottom:8px;
+    }
+
     </style>
     """, unsafe_allow_html=True)
 
 
+# ==========================================================
+# HERO BANNER
+# ==========================================================
 def hero_banner(title, subtitle):
+
+    html = f"""
+    <div style="
+        position:relative;
+        background:#F3650B;
+        border-radius:18px;
+        padding:22px 28px;
+        color:white;
+        font-family:'Inter',Arial,sans-serif;
+        overflow:hidden;
+        height:110px;
+        box-sizing:border-box;
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:16px;
+    ">
+
+        <div style="
+            position:absolute;
+            right:-30px;
+            top:-30px;
+            width:150px;
+            height:150px;
+            border-radius:50%;
+            background:rgba(255,255,255,.08);
+        "></div>
+
+        <div style="display:flex; align-items:center; gap:16px; z-index:2; min-width:0;">
+
+            <div style="
+                width:54px;
+                height:54px;
+                border-radius:14px;
+                background:rgba(255,255,255,.18);
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                font-size:28px;
+                flex-shrink:0;
+            ">
+                🏦
+            </div>
+
+            <div style="min-width:0;">
+                <div style="font-size:24px; font-weight:800; line-height:1.2; white-space:nowrap;">
+                    {title}
+                </div>
+                <div style="margin-top:4px; font-size:13px; line-height:1.4; opacity:.95;">
+                    {subtitle}
+                </div>
+            </div>
+
+        </div>
+
+        <div style="font-size:20px; font-weight:800; z-index:2; flex-shrink:0;">
+            BNI
+        </div>
+
+    </div>
+    """
+
+    components.html(html, height=120)
+
+
+# ==========================================================
+# SECTION HEADER HELPER
+# ==========================================================
+def section_header(icon, title):
+    """Ganti st.markdown('## icon title') — versi ini punya divider di
+    atas dan font-size yang proporsional (15px), bukan default h2
+    Streamlit yang gede banget (~28px)."""
     st.markdown(f"""
-    <div class="hero">
-        <h1>{title}</h1>
-        <p>{subtitle}</p>
+    <div class="section-header">
+        <div class="section-header-icon">{icon}</div>
+        <div class="section-header-title">{title}</div>
     </div>
     """, unsafe_allow_html=True)
 
 
-def metric_card(icon, title, value):
+def chart_title(text):
+    """Ganti st.markdown('#### ...') di dalam card chart — versi ini
+    12px, ga lebih gede dari section_header di atasnya."""
+    st.markdown(f'<div class="chart-title">{text}</div>', unsafe_allow_html=True)
+
+
+def rupiah_short(x):
+    """Format angka rupiah jadi singkatan: Jt = Juta, M = Miliar, T = Triliun.
+    Dipakai bareng di semua halaman biar formatnya konsisten."""
+    if x is None or (isinstance(x, float) and x != x):  # None / NaN check tanpa import pandas
+        return "Rp 0"
+    if x >= 1_000_000_000_000:
+        return f"Rp {x/1e12:.2f} T"
+    if x >= 1_000_000_000:
+        return f"Rp {x/1e9:.1f} M"
+    if x >= 1_000_000:
+        return f"Rp {x/1e6:.0f} Jt"
+    return f"Rp {x:,.0f}".replace(",", ".")
+
+
+
+
+# ==========================================================
+# KPI CARD HELPER
+# ==========================================================
+def kpi_card(label, value, icon=""):
+    """Render satu KPI card. Panggil dalam st.columns() buat bikin baris KPI."""
     st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-label">{icon} {title}</div>
-        <div class="metric-value">{value}</div>
+    <div class="kpi-card">
+        <div class="kpi-label">{icon} {label}</div>
+        <div class="kpi-value">{value}</div>
     </div>
     """, unsafe_allow_html=True)
-
-
-def status_badge(status):
-    colors = {
-        "Layak": SUCCESS,
-        "Layak Bersyarat": WARNING,
-        "Perlu Review Ulang": WARNING,
-        "Tidak Layak": DANGER,
-        "Hijau": SUCCESS,
-        "Kuning": WARNING,
-        "Merah": DANGER
-    }
-
-    color = colors.get(status, "#64748B")
-
-    st.markdown(
-        f"""
-        <span style="
-            background:{color}20;
-            color:{color};
-            padding:6px 12px;
-            border-radius:999px;
-            font-weight:600;
-            font-size:14px;
-            border:1px solid {color}55;
-            display:inline-block;
-        ">
-            {status}
-        </span>
-        """,
-        unsafe_allow_html=True,
-    )

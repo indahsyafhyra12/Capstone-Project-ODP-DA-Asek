@@ -1,296 +1,585 @@
-
-"""Overview Premium V2
-Simpan sebagai: pages_v2/00_Overview_Premium.py
-"""
-
-import sys
-from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.append(str(ROOT))
-
+import streamlit as st
 import pandas as pd
 import plotly.express as px
-import streamlit as st
+import plotly.graph_objects as go
 
-from utils.data_loader import load_master_data, get_filtered_data
-from utils.ui_components import apply_logo, ZONE_COLORS
-from utils.ui_premium import inject_css, hero_banner, metric_card, status_badge
+from utils.ui_components import apply_logo
+from utils.ui_premium import hero_banner, kpi_card, section_header, chart_title, rupiah_short, inject_css, WONDR_COLORS, ZONE_COLORS
 
-st.set_page_config(page_title="Overview Premium", page_icon="🏦", layout="wide")
+# PENTING: ini yang sebelumnya kelewat — 01_Daftar_Pengajuan_Premium.py
+# (dan halaman lain) manggil apply_logo() + inject_css() + set_page_config()
+# sendiri di atas tiap file, bukan cuma dari app_premium.py. Tanpa ini,
+# logo sidebar-nya render beda (kepotong) khusus di halaman Overview.
+st.set_page_config(page_title="Executive Overview Premium", page_icon="🏠", layout="wide")
 apply_logo()
 inject_css()
 
-ZONE_ORDER = ["Hijau","Kuning","Merah"]
+# ======================================================
+# LOAD DATA
+# ======================================================
 
-CITY_COORDS = {
-    "Jakarta Selatan": (-6.2615,106.8106),
-    "Jakarta Pusat": (-6.1805,106.8284),
-    "Jakarta Timur": (-6.2250,106.9004),
-    "Jakarta Barat": (-6.1352,106.8133),
-    "Jakarta Utara": (-6.1481,106.8998),
-    "Bekasi": (-6.2383,106.9756),
-    "Depok": (-6.4025,106.7942),
-    "Bogor": (-6.5971,106.8060),
-    "Tangerang Selatan": (-6.2897,106.7186),
-    "Tangerang": (-6.1783,106.6319),
-}
+@st.cache_data
+def load_data():
 
-def rupiah(v):
-    v=float(v)
-    if abs(v)>=1e12: return f"Rp {v/1e12:,.2f} T".replace(",", "X").replace(".", ",").replace("X",".")
-    if abs(v)>=1e9: return f"Rp {v/1e9:,.2f} M".replace(",", "X").replace(".", ",").replace("X",".")
-    if abs(v)>=1e6: return f"Rp {v/1e6:,.1f} Jt".replace(",", "X").replace(".", ",").replace("X",".")
-    return f"Rp {v:,.0f}".replace(",", ".")
+    master = pd.read_csv("data/processed/master_dataset.csv")
+    scored = pd.read_csv("data/processed/master_scored.csv")
+
+    df = master.merge(
+        scored[
+            [
+                "application_id",
+                "risk_score",
+                "decision",
+                "zone",
+                "nominal_disetujui",
+                "jenis_kredit_rekomendasi"
+            ]
+        ],
+        on="application_id",
+        how="left"
+    )
+
+    # PENTING: risk_score di master_scored.csv itu SUDAH "semakin tinggi
+    # semakin layak" (rata-rata Layak=0.81, Tidak Layak=0.36) — BUKAN skor
+    # risiko yang perlu dibalik. Versi sebelumnya salah nulis
+    # `1 - risk_score`, itu yang bikin Avg Eligibility kelihatan 0.24
+    # padahal harusnya ~0.76. Jangan dibalik lagi di sini.
+    df["credit_eligibility"] = df["risk_score"]
+
+    return df
+
+
+df = load_data()
+
+# ======================================================
+# SAFE COLUMN MAPPING (ANTI ERROR)
+# ======================================================
+
+DATE_COL = "application_date"
+df[DATE_COL] = pd.to_datetime(df[DATE_COL], errors="coerce")
+
+# ======================================================
+# HERO
+# ======================================================
 
 hero_banner(
-    "🏦 Credit Screening Agentic AI eLO",
+    "Credit Screening Agentic AI eLO",
     "Executive Dashboard • Decision Support System untuk screening awal kelayakan kredit UMKM berbasis 5C & Multi-Agent AI."
 )
 
-df = load_master_data()
+# ======================================================
+# PORTFOLIO FILTER
+# ======================================================
 
-# ================= FILTER =================
+section_header("🗂️", "Portfolio Filter")
+
 with st.container(border=True):
-    st.markdown("#### 🎛 Portfolio Filter")
-    c1,c2,c3,c4 = st.columns([1,1,1,2])
+
+    c1, c2, c3, c4 = st.columns([1.1, 1.1, 1.1, 1.5])
 
     with c1:
-        branch = st.selectbox("Cabang",["Semua Cabang"]+sorted(df.branch_name.unique().tolist()))
-
-    with c2:
-        industry = st.selectbox("Industri",["Semua Industri"]+sorted(df.industry.unique().tolist()))
-
-    with c3:
-        if "sub_industry" in df.columns:
-            sub_opts=["Semua Sub-Industry"]+sorted(df.sub_industry.dropna().unique().tolist())
-            sub=st.selectbox("Sub-Industry",sub_opts)
-        else:
-            sub="Semua Sub-Industry"
-
-    with c4:
-        dr=st.date_input("Tanggal",value=(df.application_date.min(),df.application_date.max()))
-
-filtered=get_filtered_data(df,branch=branch,industry=industry,date_range=dr if len(dr)==2 else None)
-
-if "sub_industry" in filtered.columns and sub!="Semua Sub-Industry":
-    filtered=filtered[filtered.sub_industry==sub]
-
-if filtered.empty:
-    st.warning("Tidak ada data.")
-    st.stop()
-
-# ================= KPI =================
-approved=filtered.decision.isin(["Layak","Layak Bersyarat"])
-
-st.markdown("### 📌 Executive Summary")
-
-cols=st.columns(5)
-items=[
-("📋","Total Pengajuan",f"{len(filtered):,}".replace(",", ".")),
-("✅","Approval Rate",f"{approved.mean()*100:.1f}%"),
-("🟢","Avg Eligibility Score",f"{filtered.risk_score.mean():.2f}"),
-("💰","Disetujui",rupiah(filtered.nominal_disetujui.sum())),
-("🚫","DHN",int((filtered.status_dhn=="Ya").sum()))
-]
-for col,(i,t,v) in zip(cols,items):
-    with col:
-        metric_card(i,t,v)
-
-# ================= HERO SECTION =================
-st.markdown("### 🤖 AI Screening Outcome")
-
-left,right=st.columns([1.3,1])
-
-with left:
-    with st.container(border=True):
-        st.markdown("#### AI Decision Funnel")
-
-        stage=pd.DataFrame({
-            "Stage":[
-                "Total Pengajuan",
-                "Layak + Bersyarat",
-                "Review",
-                "Tidak Layak"
-            ],
-            "Count":[
-                len(filtered),
-                filtered.decision.isin(["Layak","Layak Bersyarat"]).sum(),
-                (filtered.decision=="Perlu Review Ulang").sum(),
-                (filtered.decision=="Tidak Layak").sum()
-            ]
-        })
-
-        fig=px.funnel(
-            stage,
-            y="Stage",
-            x="Count",
-            color="Stage",
-            color_discrete_sequence=["#F36F21","#16A34A","#F59E0B","#DC2626"]
+        branch = st.selectbox(
+            "Cabang",
+            ["Semua Cabang"] + sorted(df.branch_name.dropna().unique().tolist())
         )
 
-        fig.update_layout(height=360,showlegend=False,margin=dict(t=20,b=20))
-        st.plotly_chart(fig,width="stretch")
+    with c2:
+        industry = st.selectbox(
+            "Industri",
+            ["Semua Industri"] + sorted(df.industry.dropna().unique().tolist())
+        )
 
-with right:
-    with st.container(border=True):
-        st.markdown("#### Portfolio Quality")
+    with c3:
+        sub = st.selectbox(
+            "Sub-Industry",
+            ["Semua Sub-Industry"] + sorted(df.sub_industry.dropna().unique().tolist())
+        )
 
-        zone=filtered.zone.value_counts().reindex(ZONE_ORDER).fillna(0).reset_index()
-        zone.columns=["Zone","Count"]
+    with c4:
+        date_range = st.date_input(
+            "Periode",
+            value=(df[DATE_COL].min().date(), df[DATE_COL].max().date()),
+            min_value=df[DATE_COL].min().date(),
+            max_value=df[DATE_COL].max().date(),
+        )
 
-        fig=px.pie(zone,names="Zone",values="Count",hole=.55,color="Zone",color_discrete_map=ZONE_COLORS)
-        fig.update_traces(textinfo="percent+label")
-        fig.update_layout(height=260,margin=dict(t=10,b=10))
-        st.plotly_chart(fig,width="stretch")
+# ======================================================
+# APPLY FILTER
+# ======================================================
 
-        dhn=filtered[filtered.status_dhn=="Ya"]
-        pct=100 if len(dhn)==0 else (dhn.decision=="Tidak Layak").mean()*100
+filtered = df.copy()
 
-        st.metric("DHN Auto Reject",f"{pct:.1f}%")
-        status_badge("Hijau" if pct==100 else "Merah")
+if branch != "Semua Cabang":
+    filtered = filtered[filtered.branch_name == branch]
 
-# ================= FINANCIAL =================
-st.markdown("### 💼 Financial Snapshot")
+if industry != "Semua Industri":
+    filtered = filtered[filtered.industry == industry]
 
-c1,c2,c3=st.columns(3)
+if sub != "Semua Sub-Industry":
+    filtered = filtered[filtered.sub_industry == sub]
+
+if len(date_range) == 2:
+    start_date, end_date = date_range
+    filtered = filtered[
+        (filtered[DATE_COL] >= pd.to_datetime(start_date))
+        & (filtered[DATE_COL] <= pd.to_datetime(end_date))
+    ]
+
+# ======================================================
+# FORMAT RUPIAH
+# ======================================================
+
+# ======================================================
+# FORMAT RUPIAH
+# ======================================================
+# rupiah_short() sekarang dari utils/ui_premium.py — dipake bareng
+# sama halaman lain (Daftar Pengajuan), jangan definisiin ulang di sini.
+
+
+# ======================================================
+# EXECUTIVE SUMMARY
+# ======================================================
+
+total = len(filtered)
+
+layak = (filtered.decision == "Layak").sum()
+layak_bersyarat = (filtered.decision == "Layak Bersyarat").sum()
+review = (filtered.decision == "Perlu Review Ulang").sum()
+tidak_layak = (filtered.decision == "Tidak Layak").sum()
+
+approval = (layak + layak_bersyarat) / total if total else 0
+
+avg_eligibility = filtered.credit_eligibility.mean()
+
+nominal = filtered.nominal_disetujui.fillna(0).sum()
+
+# "Cabang Aktif" dihitung dari kombinasi branch_name + region, BUKAN
+# branch_name doang — karena 1 nama cabang (misal "KCP Cibubur") muncul
+# di ke-4 region sebagai 4 kantor fisik berbeda. branch_name.nunique()
+# cuma ngasih 10 (salah), branch_name+region ngasih 40 (bener, cocok
+# sama jumlah RM di rm_master).
+cabang = filtered[["branch_name", "region"]].drop_duplicates().shape[0]
+
+section_header("📌", "Executive Summary")
+
+c1, c2, c3, c4, c5 = st.columns(5)
 
 with c1:
-    with st.container(border=True):
-        growth=pd.Series(["Growth Positif" if x>0 else "Growth Negatif" for x in filtered.revenue_growth_pct]).value_counts().reset_index()
-        growth.columns=["kategori","count"]
-        fig=px.pie(growth,names="kategori",values="count",hole=.45,color="kategori",
-                   color_discrete_map={"Growth Positif":"#16A34A","Growth Negatif":"#DC2626"})
-        fig.update_layout(height=280)
-        st.plotly_chart(fig,width="stretch")
-
+    kpi_card("Total Pengajuan", f"{total:,}".replace(",", "."), "📋")
 with c2:
-    with st.container(border=True):
-        fig=px.histogram(filtered["monthly_turnover_est"]/1e6,nbins=24,title="Monthly Turnover")
-        fig.update_layout(height=280,xaxis_title="Juta Rupiah")
-        st.plotly_chart(fig,width="stretch")
-
+    kpi_card("Approval Rate", f"{approval:.1%}", "✅")
 with c3:
+    kpi_card("Avg Eligibility", f"{avg_eligibility:.2f}", "🟢")
+with c4:
+    kpi_card("Disetujui", rupiah_short(nominal), "💰")
+with c5:
+    kpi_card("Cabang Aktif", str(cabang), "🏦")
+
+# ======================================================
+# RINGKASAN HASIL SCREENING
+# ======================================================
+
+section_header("✅", "Ringkasan Hasil Screening")
+
+s1, s2, s3 = st.columns([1.2, 1, 1])
+
+with s1:
     with st.container(border=True):
-        fig=px.histogram(filtered,x="employee_count",nbins=20,title="Employee Count")
-        fig.update_layout(height=280)
-        st.plotly_chart(fig,width="stretch")
 
-# ================= INDUSTRY =================
-st.markdown("### 🏭 Industry Intelligence")
+        chart_title("AI Decision Funnel")
 
-i1,i2=st.columns([1.3,1])
+        funnel = pd.DataFrame({
+            "Stage": ["Total Pengajuan", "Layak + Bersyarat", "Tidak Layak", "Review"],
+            "Value": [total, layak + layak_bersyarat, tidak_layak, review]
+        })
+
+        # Warna dibalikin ke gaya original: Total pakai oranye wondr
+        # (bukan abu-abu netral), Layak+Bersyarat/Tidak Layak/Review
+        # tetap pakai warna zone biar konsisten sama Portfolio Quality
+        # donut di sebelahnya. Review pakai kuning (bukan oranye
+        # perlu_review) biar ga mirip sama warna Total.
+        fig = go.Figure(go.Bar(
+            x=funnel["Value"],
+            y=funnel["Stage"],
+            orientation="h",
+            text=funnel["Value"].apply(lambda v: f"{v:,}".replace(",", ".")),
+            textposition="outside",
+            textfont=dict(size=13),
+            marker_color=[
+                WONDR_COLORS["orange"]["core"],
+                ZONE_COLORS["layak"],
+                ZONE_COLORS["tidak_layak"],
+                ZONE_COLORS["layak_bersyarat"],
+            ],
+        ))
+
+        fig.update_layout(
+            height=280,
+            margin=dict(l=0, r=40, t=10, b=10),
+            xaxis=dict(visible=False, range=[0, total * 1.25]),
+            yaxis=dict(categoryorder="array", categoryarray=funnel.Stage[::-1]),
+            showlegend=False,
+            font=dict(family="Inter, sans-serif"),
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Legend eksplisit — warna di sini juga dipakai buat makna zone
+        # di chart lain, jadi perlu ditulis jelas apa maksud tiap warna.
+        st.markdown(
+            f"""
+            <div style="display:flex; flex-wrap:wrap; gap:12px; font-size:10px; color:#6B7280; padding-top:6px; border-top:1px solid #F3F4F6;">
+                <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:{WONDR_COLORS["orange"]["core"]};margin-right:4px;"></span>Total pengajuan</span>
+                <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:{ZONE_COLORS["layak"]};margin-right:4px;"></span>Layak + Bersyarat</span>
+                <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:{ZONE_COLORS["tidak_layak"]};margin-right:4px;"></span>Tidak Layak</span>
+                <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:{ZONE_COLORS["layak_bersyarat"]};margin-right:4px;"></span>Perlu Review</span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+with s2:
+    with st.container(border=True):
+
+        chart_title("Portfolio quality (zone)")
+
+        quality = (
+            filtered["zone"]
+            .value_counts()
+            .reindex(["Hijau", "Kuning", "Merah"])
+            .fillna(0)
+        )
+
+        fig = go.Figure(go.Pie(
+            labels=quality.index,
+            values=quality.values,
+            hole=0.6,
+            marker_colors=[ZONE_COLORS["layak"], ZONE_COLORS["layak_bersyarat"], ZONE_COLORS["tidak_layak"]],
+            textinfo="percent",
+        ))
+
+        fig.update_layout(height=260, margin=dict(l=0, r=0, t=10, b=10), showlegend=True,
+                           font=dict(family="Inter, sans-serif"))
+
+        st.plotly_chart(fig, use_container_width=True)
+
+with s3:
+    with st.container(border=True):
+
+        chart_title("Jenis kredit diajukan")
+
+        kredit = filtered["jenis_kredit_diajukan"].value_counts()
+
+        fig = go.Figure(go.Pie(
+            labels=kredit.index,
+            values=kredit.values,
+            hole=0.6,
+            marker_colors=[
+                WONDR_COLORS["orange"]["core"],
+                WONDR_COLORS["turquoise"]["core"],
+                WONDR_COLORS["pink"]["core"],
+            ],
+            textinfo="percent",
+        ))
+
+        fig.update_layout(height=260, margin=dict(l=0, r=0, t=10, b=10), showlegend=True,
+                           font=dict(family="Inter, sans-serif"))
+
+        st.plotly_chart(fig, use_container_width=True)
+
+# ======================================================
+# PROFIL NASABAH
+# ======================================================
+
+section_header("👤", "Profil Nasabah")
+
+n1, n2, n3, n4 = st.columns(4)
+
+with n1:
+    with st.container(border=True):
+        chart_title("Badan usaha")
+        entity = filtered["legal_entity"].value_counts()
+        fig = go.Figure(go.Pie(
+            labels=entity.index, values=entity.values, hole=0.6,
+            marker_colors=[WONDR_COLORS["turquoise"][t] for t in ["core", "shadow1", "shadow2"]],
+            textinfo="percent",
+        ))
+        fig.update_layout(height=220, margin=dict(l=0, r=0, t=10, b=10), showlegend=True,
+                           font=dict(family="Inter, sans-serif"))
+        st.plotly_chart(fig, use_container_width=True)
+
+with n2:
+    with st.container(border=True):
+        chart_title("Usia bisnis (tahun)")
+        fig = px.histogram(
+            filtered, x="business_age_year", nbins=10,
+            color_discrete_sequence=[WONDR_COLORS["purple"]["core"]],
+        )
+        fig.update_layout(height=220, margin=dict(l=0, r=0, t=10, b=10), showlegend=False,
+                           yaxis_title=None, xaxis_title=None, font=dict(family="Inter, sans-serif"))
+        st.plotly_chart(fig, use_container_width=True)
+
+with n3:
+    with st.container(border=True):
+        chart_title("Pendidikan pemilik")
+        edu_order = ["SMA/SMK", "D3", "S1", "S2"]
+        edu = filtered["owner_education"].value_counts().reindex(edu_order).fillna(0)
+        fig = go.Figure(go.Bar(
+            x=edu.values, y=edu.index, orientation="h",
+            marker_color=WONDR_COLORS["pink"]["core"],
+        ))
+        fig.update_layout(height=220, margin=dict(l=0, r=0, t=10, b=10), showlegend=False,
+                           xaxis_title=None, font=dict(family="Inter, sans-serif"))
+        st.plotly_chart(fig, use_container_width=True)
+
+with n4:
+    with st.container(border=True):
+        chart_title("Gender pemilik")
+        # Kolom aslinya owner_gender, bukan "gender"/"jenis_kelamin" (2 nama
+        # itu ga ada di data — versi sebelumnya salah nebak nama kolom).
+        gender = filtered["owner_gender"].value_counts()
+        fig = go.Figure(go.Pie(
+            labels=gender.index.map({"P": "Perempuan", "L": "Laki-laki"}),
+            values=gender.values, hole=0.6,
+            marker_colors=[WONDR_COLORS["orange"]["core"], WONDR_COLORS["orange"]["highlight"]],
+            textinfo="percent",
+        ))
+        fig.update_layout(height=220, margin=dict(l=0, r=0, t=10, b=10), showlegend=True,
+                           font=dict(family="Inter, sans-serif"))
+        st.plotly_chart(fig, use_container_width=True)
+
+# ======================================================
+# GEOGRAPHIC INSIGHTS
+# ======================================================
+
+section_header("🌍", "Geographic Insights")
+
+# PENTING: branch_coords ini isinya nama KOTA, jadi lookup-nya harus
+# pakai kolom `city`, bukan `branch_name`. Versi sebelumnya nge-lookup
+# pakai branch_name (isinya "KCP Cibubur" dst) yang ga match sama
+# sekali ke dictionary ini — hasilnya semua baris ke-drop dan peta
+# kosong.
+branch_coords = {
+    "Jakarta Pusat": (-6.175, 106.827),
+    "Jakarta Selatan": (-6.261, 106.811),
+    "Jakarta Barat": (-6.167, 106.763),
+    "Jakarta Timur": (-6.225, 106.900),
+    "Jakarta Utara": (-6.138, 106.880),
+    "Bekasi": (-6.238, 106.975),
+    "Depok": (-6.402, 106.794),
+    "Bogor": (-6.595, 106.816),
+    "Tangerang": (-6.178, 106.631),
+    "Tangerang Selatan": (-6.286, 106.718),
+}
+
+geo = (
+    filtered.groupby("city", as_index=False)
+    .agg(
+        total_pengajuan=("application_id", "count"),
+        avg_eligibility=("credit_eligibility", "mean"),
+    )
+)
+
+geo["lat"] = geo["city"].map(lambda x: branch_coords.get(x, (None, None))[0])
+geo["lon"] = geo["city"].map(lambda x: branch_coords.get(x, (None, None))[1])
+geo = geo.dropna(subset=["lat", "lon"])
+
+with st.container(border=True):
+    if geo.empty:
+        st.info("Tidak ada data lokasi untuk filter saat ini.")
+    else:
+        fig = px.scatter_mapbox(
+            geo, lat="lat", lon="lon",
+            size="total_pengajuan", color="avg_eligibility",
+            hover_name="city",
+            hover_data={"total_pengajuan": True, "avg_eligibility": ":.2f", "lat": False, "lon": False},
+            color_continuous_scale="RdYlGn", zoom=8, height=480,
+        )
+        fig.update_layout(mapbox_style="open-street-map", margin=dict(l=0, r=0, t=0, b=0))
+        st.plotly_chart(fig, use_container_width=True)
+
+# ======================================================
+# FINANCIAL SNAPSHOT
+# ======================================================
+
+section_header("💰", "Financial Snapshot")
+
+f1, f2, f3 = st.columns(3)
+
+with f1:
+    with st.container(border=True):
+        chart_title("Growth revenue (2024→2025)")
+        growth = (filtered["revenue_growth_pct"] > 0).map({True: "Growth Positif", False: "Growth Negatif"})
+        counts = growth.value_counts()
+        fig = go.Figure(go.Pie(
+            labels=counts.index, values=counts.values, hole=0.6,
+            marker_colors=[ZONE_COLORS["layak"], ZONE_COLORS["tidak_layak"]],
+            textinfo="percent",
+        ))
+        fig.update_layout(height=260, margin=dict(l=0, r=0, t=10, b=10), showlegend=True,
+                           font=dict(family="Inter, sans-serif"))
+        st.plotly_chart(fig, use_container_width=True)
+
+with f2:
+    with st.container(border=True):
+        chart_title("Monthly turnover")
+        fig = px.histogram(
+            filtered, x="monthly_turnover_est", nbins=25,
+            color_discrete_sequence=[WONDR_COLORS["turquoise"]["core"]],
+        )
+        fig.update_layout(height=260, margin=dict(l=0, r=0, t=10, b=10), showlegend=False,
+                           yaxis_title=None, xaxis_title="Rp", font=dict(family="Inter, sans-serif"))
+        st.plotly_chart(fig, use_container_width=True)
+
+with f3:
+    with st.container(border=True):
+        chart_title("Employee count")
+        fig = px.histogram(
+            filtered, x="employee_count", nbins=20,
+            color_discrete_sequence=[WONDR_COLORS["purple"]["core"]],
+        )
+        fig.update_layout(height=260, margin=dict(l=0, r=0, t=10, b=10), showlegend=False,
+                           yaxis_title=None, xaxis_title=None, font=dict(family="Inter, sans-serif"))
+        st.plotly_chart(fig, use_container_width=True)
+
+# ======================================================
+# INDUSTRY INTELLIGENCE
+# ======================================================
+
+section_header("🏭", "Industry Intelligence")
+
+i1, i2 = st.columns([1.2, 1])
+
+ind = (
+    filtered.groupby("industry")
+    .agg(
+        Applications=("application_id", "count"),
+        Eligibility=("credit_eligibility", "mean")
+    )
+    .reset_index()
+)
 
 with i1:
     with st.container(border=True):
-        treemap=filtered.groupby("industry").agg(
-            Exposure=("loan_requested","sum"),
-            AvgEligibility=("risk_score","mean")
-        ).reset_index()
-
-        fig=px.treemap(
-            treemap,
-            path=["industry"],
-            values="Exposure",
-            color="AvgEligibility",
-            color_continuous_scale="RdYlGn"
+        fig = px.treemap(
+            ind, path=["industry"], values="Applications",
+            color="Eligibility", color_continuous_scale="RdYlGn",
         )
-        fig.update_layout(height=360)
-        st.plotly_chart(fig,width="stretch")
+        fig.update_layout(height=400, font=dict(family="Inter, sans-serif"))
+        st.plotly_chart(fig, use_container_width=True)
 
 with i2:
     with st.container(border=True):
-        if "sub_industry" in filtered.columns:
-            sub_rank=(filtered.groupby("sub_industry")
-                      .agg(AvgEligibility=("risk_score","mean"),Applications=("application_id","count"))
-                      .sort_values("AvgEligibility",ascending=True)
-                      .head(10)
-                      .reset_index())
-
-            fig=px.bar(sub_rank,y="sub_industry",x="AvgEligibility",orientation="h",color="AvgEligibility",color_continuous_scale="RdYlGn")
-            fig.update_layout(height=360,yaxis_title="")
-            st.plotly_chart(fig,width="stretch")
-        else:
-            st.info("Kolom sub_industry tidak tersedia.")
-
-# ================= MAP =================
-st.markdown("### 🌍 Geographic Insights")
-
-with st.container(border=True):
-    city=(filtered.groupby("city")
-          .agg(Customers=("application_id","count"),AvgEligibility=("risk_score","mean"))
-          .reset_index())
-
-    city["lat"]=city.city.map(lambda x:CITY_COORDS.get(x,(None,None))[0])
-    city["lon"]=city.city.map(lambda x:CITY_COORDS.get(x,(None,None))[1])
-    city=city.dropna()
-
-    fig=px.scatter_mapbox(city,lat="lat",lon="lon",size="Customers",color="AvgEligibility",
-                          hover_name="city",color_continuous_scale="RdYlGn",zoom=8.5,size_max=45)
-    fig.update_layout(mapbox_style="open-street-map",height=420,margin=dict(t=0,b=0,l=0,r=0))
-    st.plotly_chart(fig,width="stretch")
-
-
-# ================= WATCHLIST =================
-st.markdown("### 🚨 Priority Review Queue")
-
-with st.container(border=True):
-    priority = filtered["decision"].map({
-        "Tidak Layak": 0,
-        "Perlu Review Ulang": 1,
-        "Layak Bersyarat": 2,
-        "Layak": 3
-    }).fillna(4)
-
-    watch = (
-        filtered.assign(priority=priority)
-        .sort_values(
-            by=["status_dhn", "priority", "risk_score"],
-            ascending=[False, True, True]
+        sub_top = (
+            filtered.groupby("sub_industry")["credit_eligibility"]
+            .mean().nlargest(10).sort_values().reset_index()
         )
-        .head(10)[[
-            "company_name",
-            "branch_name",
-            "industry",
-            "risk_score",
-            "decision"
-        ]]
-        .rename(columns={
-            "company_name": "Company",
-            "branch_name": "Branch",
-            "industry": "Industry",
-            "risk_score": "Eligibility Score",
-            "decision": "Decision"
-        })
+        fig = px.bar(
+            sub_top, x="credit_eligibility", y="sub_industry", orientation="h",
+            color="credit_eligibility", color_continuous_scale="RdYlGn",
+        )
+        fig.update_layout(height=400, coloraxis_showscale=False, font=dict(family="Inter, sans-serif"))
+        st.plotly_chart(fig, use_container_width=True)
+
+if not ind.empty:
+    top_ind = ind.sort_values("Eligibility", ascending=False).iloc[0]
+    st.info(
+        f"**{top_ind.industry}** memiliki rata-rata Credit Eligibility tertinggi "
+        f"({top_ind.Eligibility:.2f}) dengan **{top_ind.Applications:,}** pengajuan."
     )
 
-    st.dataframe(watch, width="stretch", hide_index=True)
+# ======================================================
+# BRANCH INTELLIGENCE
+# ======================================================
 
-# ================= BRANCH =================
-st.markdown("### 🏢 Branch Performance")
+section_header("🏦", "Branch Intelligence")
 
-b1,b2=st.columns([1,1.3])
+# Group by branch_name + region (bukan branch_name doang) — 1 nama
+# cabang muncul di 4 region berbeda sebagai kantor fisik yang beda.
+branch_perf = (
+    filtered.groupby(["branch_name", "region"])
+    .agg(
+        Approval=("decision", lambda x: x.isin(["Layak", "Layak Bersyarat"]).mean()),
+        Eligibility=("credit_eligibility", "mean")
+    )
+    .reset_index()
+)
+branch_perf["label"] = branch_perf["branch_name"] + " (" + branch_perf["region"] + ")"
 
-summary=(filtered.groupby("branch_name")
-         .agg(Applications=("application_id","count"),
-              Approval=("decision",lambda s:s.isin(["Layak","Layak Bersyarat"]).mean()*100),
-              AvgEligibility=("risk_score","mean"))
-         .reset_index())
-
-summary["Approval"]=summary["Approval"].round(1)
-summary["AvgEligibility"]=summary["AvgEligibility"].round(2)
+b1, b2 = st.columns([1.4, 1])
 
 with b1:
     with st.container(border=True):
-        top=summary.sort_values("Applications",ascending=False).head(10)
-        fig=px.bar(top,x="Applications",y="branch_name",orientation="h",color="Applications",color_continuous_scale="RdYlGn")
-        fig.update_layout(height=380,yaxis_title="")
-        st.plotly_chart(fig,width="stretch")
+        top5 = branch_perf.nlargest(5, "Approval")
+        fig = px.bar(
+            top5, x="Approval", y="label", orientation="h",
+            color="Eligibility", color_continuous_scale="RdYlGn", text="Approval",
+        )
+        fig.update_traces(texttemplate="%{text:.0%}")
+        fig.update_layout(height=320, margin=dict(l=0, r=0, t=10, b=10), yaxis_title=None,
+                           font=dict(family="Inter, sans-serif"))
+        st.plotly_chart(fig, use_container_width=True)
 
 with b2:
     with st.container(border=True):
-        styled=(summary.sort_values("Applications",ascending=False)
-                .style.background_gradient(subset=["Approval"],cmap="Greens")
-                .background_gradient(subset=["AvgEligibility"],cmap="RdYlGn"))
-        st.dataframe(styled,width="stretch",hide_index=True)
+        chart_title(f"🔍 Cabang perlu perhatian")
+        st.markdown(
+            f'<div style="font-size:10px;color:#9CA3AF;margin-top:-6px;margin-bottom:10px;">'
+            f'5 cabang dengan approval rate di bawah rata-rata portofolio ({approval:.1%})</div>',
+            unsafe_allow_html=True
+        )
+        worst = branch_perf.nsmallest(5, "Approval")
+        for _, r in worst.iterrows():
+            delta_pp = (r.Approval - approval) * 100
+            st.markdown(
+                f"""
+                <div style="border:1px solid #E5E7EB; border-radius:12px; padding:10px 12px; margin-bottom:10px; background:white;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-weight:600;color:#1F2937;font-size:13px;">{r.label}</span>
+                        <span style="color:#C64827;font-size:13px;font-weight:700;">{r.Approval:.1%}</span>
+                    </div>
+                    <div style="color:#9CA3AF;font-size:11px;margin-top:2px;">{delta_pp:.1f}pp dari rata-rata</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+# ======================================================
+# AI EXECUTIVE INSIGHT
+# ======================================================
+
+section_header("🤖", "AI Executive Insight")
+
+top_credit = filtered["jenis_kredit_diajukan"].mode()[0] if not filtered.empty else "-"
+top_industry = ind.sort_values("Eligibility", ascending=False).iloc[0]["industry"] if not ind.empty else "-"
+yellow = (filtered.zone == "Kuning").sum()
+best_branch = branch_perf.sort_values("Eligibility", ascending=False).iloc[0] if not branch_perf.empty else None
+
+r1, r2 = st.columns(2)
+r3, r4 = st.columns(2)
+
+with r1:
+    st.success(f"**{top_credit}** menjadi jenis kredit yang paling banyak diajukan oleh debitur.")
+with r2:
+    st.success(f"Approval Rate mencapai **{approval:.1%}**, menunjukkan mayoritas pengajuan memenuhi kriteria kelayakan.")
+with r3:
+    st.info(f"**{top_industry}** merupakan industri dengan rata-rata Credit Eligibility tertinggi.")
+with r4:
+    st.warning(f"Terdapat **{yellow}** debitur pada **Zona Kuning** yang perlu diprioritaskan untuk monitoring lanjutan.")
+
+st.markdown("---")
+
+if best_branch is not None:
+    st.markdown(
+        f"""
+        <div style="background:#FFF7ED; border-left:5px solid #F87336; border-radius:12px; padding:16px 18px;">
+            <div style="font-weight:700;color:#1F2937;margin-bottom:6px;">Executive Takeaway</div>
+            <div style="color:#4B5563;line-height:1.6;">
+                Cabang <b>{best_branch.label}</b> menunjukkan performa terbaik berdasarkan
+                Credit Eligibility. Fokus peningkatan berikutnya adalah melakukan pendampingan pada
+                debitur Zona Kuning serta mengoptimalkan portofolio di industri dengan eligibility yang masih rendah.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )

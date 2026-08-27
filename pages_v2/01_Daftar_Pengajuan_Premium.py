@@ -1,4 +1,3 @@
-
 """Daftar Pengajuan Premium V2
 Simpan sebagai: pages_v2/01_Daftar_Pengajuan_Premium.py
 """
@@ -14,7 +13,7 @@ import pandas as pd
 
 from utils.data_loader import load_master_data
 from utils.ui_components import apply_logo
-from utils.ui_premium import inject_css, hero_banner
+from utils.ui_premium import inject_css, hero_banner, kpi_card, section_header, chart_title, rupiah_short
 
 st.set_page_config(page_title="Daftar Pengajuan Premium", page_icon="📋", layout="wide")
 apply_logo()
@@ -23,15 +22,16 @@ inject_css()
 df = load_master_data()
 
 hero_banner(
-    "📋 Daftar Pengajuan Kredit",
+    "Daftar Pengajuan Kredit",
     "Queue operasional untuk Credit Analyst & Relationship Manager."
 )
 
 # ---------- FILTER ----------
-with st.container(border=True):
-    st.markdown("#### 🔎 Smart Search & Filter")
+section_header("🔎", "Smart Search & Filter")
 
-    c1,c2,c3,c4 = st.columns([1.1,1,1,1.2])
+with st.container(border=True):
+
+    c1, c2, c3, c4, c5 = st.columns([1.2, 0.9, 0.9, 0.9, 0.9])
 
     with c1:
         search = st.text_input(
@@ -46,15 +46,25 @@ with st.container(border=True):
         )
 
     with c3:
-        decision = st.selectbox(
-            "Keputusan",
-            ["Semua","Layak","Layak Bersyarat","Perlu Review Ulang","Tidak Layak"]
+        entity = st.selectbox(
+            "Badan Usaha",
+            ["Semua"] + sorted(df.legal_entity.unique().tolist())
         )
 
     with c4:
-        zone = st.selectbox(
-            "Zona",
-            ["Semua","Hijau","Kuning","Merah"]
+        # Industri dipilih daripada Zona — Zona (Hijau/Kuning/Merah) itu
+        # turunan langsung dari Keputusan, jadi infonya udah kecover di
+        # filter Keputusan. Industri belum ada filter-nya sama sekali
+        # di halaman ini sebelumnya.
+        industry = st.selectbox(
+            "Industri",
+            ["Semua"] + sorted(df.industry.dropna().unique().tolist())
+        )
+
+    with c5:
+        decision = st.selectbox(
+            "Keputusan",
+            ["Semua", "Layak", "Layak Bersyarat", "Perlu Review Ulang", "Tidak Layak"]
         )
 
 # ---------- FILTER LOGIC ----------
@@ -75,54 +85,56 @@ if branch != "Semua":
 if decision != "Semua":
     filtered = filtered[filtered.decision == decision]
 
-if zone != "Semua":
-    filtered = filtered[filtered.zone == zone]
+if industry != "Semua":
+    filtered = filtered[filtered.industry == industry]
+
+if entity != "Semua":
+    filtered = filtered[filtered.legal_entity == entity]
 
 # ---------- SUMMARY ----------
-st.markdown("### 📊 Queue Summary")
+section_header("📊", "Queue Summary")
 
-a,b,c,d = st.columns(4)
+a, b, c, d = st.columns(4)
 
 with a:
-    st.metric("Total Queue", len(filtered))
-
+    kpi_card("Total Queue", f"{len(filtered):,}".replace(",", "."), "📋")
 with b:
-    st.metric("Need Review", int((filtered.decision=="Perlu Review Ulang").sum()))
-
+    kpi_card("Need Review", int((filtered.decision == "Perlu Review Ulang").sum()), "🟡")
 with c:
-    st.metric("DHN Cases", int((filtered.status_dhn=="Ya").sum()))
-
+    kpi_card("DHN Cases", int((filtered.status_dhn == "Ya").sum()), "🚫")
 with d:
-    st.metric("Avg Eligibility", f"{filtered.risk_score.mean():.2f}")
+    # risk_score sudah "makin tinggi makin layak" — jangan dibalik (1 - risk_score),
+    # sama seperti fix di 00_Overview_Premium.py.
+    kpi_card("Avg Eligibility", f"{filtered.risk_score.mean():.2f}", "🟢")
 
 # ---------- QUICK INSIGHT ----------
-st.markdown("### 💡 AI Queue Insight")
+section_header("💡", "Queue Snapshot")
 
-i1,i2,i3 = st.columns(3)
+i1, i2, i3 = st.columns(3)
 
 with i1:
     with st.container(border=True):
         top_branch = filtered.branch_name.mode().iloc[0] if len(filtered) else "-"
-        st.markdown("**Cabang Teraktif**")
+        chart_title("Cabang Teraktif")
         st.markdown(f"### {top_branch}")
         st.caption("Volume pengajuan tertinggi pada filter saat ini.")
 
 with i2:
     with st.container(border=True):
         top_industry = filtered.industry.mode().iloc[0] if len(filtered) else "-"
-        st.markdown("**Industri Dominan**")
+        chart_title("Industri Dominan")
         st.markdown(f"### {top_industry}")
         st.caption("Sektor dengan jumlah aplikasi terbanyak.")
 
 with i3:
     with st.container(border=True):
-        review_pct = (filtered.decision=="Perlu Review Ulang").mean()*100 if len(filtered) else 0
-        st.markdown("**Manual Review Rate**")
+        review_pct = (filtered.decision == "Perlu Review Ulang").mean() * 100 if len(filtered) else 0
+        chart_title("Manual Review Rate")
         st.markdown(f"### {review_pct:.1f}%")
         st.caption("Semakin kecil semakin efisien screening AI.")
 
 # ---------- TABLE ----------
-st.markdown("### 📄 Daftar Pengajuan")
+section_header("📄", "Daftar Pengajuan")
 
 table = filtered[[
     "application_id",
@@ -130,67 +142,92 @@ table = filtered[[
     "owner_name",
     "branch_name",
     "industry",
+    "sub_industry",
     "loan_requested",
     "risk_score",
     "decision"
 ]].copy()
 
 table.rename(columns={
-    "application_id":"ID Pengajuan",
-    "company_name":"Perusahaan",
-    "owner_name":"Pemilik",
-    "branch_name":"Cabang",
-    "industry":"Industri",
-    "loan_requested":"Pinjaman",
-    "risk_score":"Eligibility Score",
-    "decision":"Keputusan"
+    "application_id": "ID Pengajuan",
+    "company_name": "Perusahaan",
+    "owner_name": "Pemilik",
+    "branch_name": "Cabang",
+    "industry": "Industri",
+    "sub_industry": "Sub-Industri",
+    "loan_requested": "Pinjaman",
+    "risk_score": "Eligibility Score",
+    "decision": "Keputusan"
 }, inplace=True)
 
-table["Pinjaman"] = table["Pinjaman"].map(lambda x:f"Rp {x:,.0f}".replace(",","."))
+table["Pinjaman"] = table["Pinjaman"].map(rupiah_short)
+
 
 def decision_badge(val):
-    colors={
-        "Layak":"#16A34A",
-        "Layak Bersyarat":"#F59E0B",
-        "Perlu Review Ulang":"#EA580C",
-        "Tidak Layak":"#DC2626"
+    colors = {
+        "Layak": "#16A34A",
+        "Layak Bersyarat": "#F59E0B",
+        "Perlu Review Ulang": "#EA580C",
+        "Tidak Layak": "#DC2626"
     }
-    c=colors.get(val,"#64748B")
+    c = colors.get(val, "#64748B")
     return f'background:{c}20;color:{c};font-weight:700;border:1px solid {c}55;border-radius:999px;text-align:center;'
 
-styled=(table.style
-    .format({"Eligibility Score":"{:.2f}"})
-    .background_gradient(subset=["Eligibility Score"],cmap="RdYlGn")
-    .map(decision_badge,subset=["Keputusan"]))
 
-st.dataframe(styled,width="stretch",hide_index=True,height=520)
+styled = (table.style
+          .format({"Eligibility Score": "{:.2f}"})
+          .background_gradient(subset=["Eligibility Score"], cmap="RdYlGn")
+          .map(decision_badge, subset=["Keputusan"]))
+
+with st.container(border=True):
+    st.dataframe(styled, width="stretch", hide_index=True, height=520)
 
 # ---------- PRIORITY ACTION ----------
-st.markdown("### 🚨 Priority Action")
+section_header("🚨", "Priority Action")
 
-priority = (
-    filtered.assign(priority=filtered["decision"].map({
-        "Tidak Layak":0,
-        "Perlu Review Ulang":1,
-        "Layak Bersyarat":2,
-        "Layak":3
-    }).fillna(4))
-    .sort_values(["status_dhn","priority","risk_score"],ascending=[False,True,True])
-    .head(5)
+
+def priority_reason(row):
+    # Kasus yang BENERAN butuh tindakan manusia — bukan yang udah final
+    # ditolak. "Tidak Layak" polos (tanpa DHN flag) sengaja ga masuk sini
+    # karena statusnya udah final, ga ada action yang perlu diambil lagi.
+    if row["status_dhn"] == "Ya":
+        return "DHN Flag", "🚫", 0
+    if row["decision"] == "Perlu Review Ulang":
+        return "Perlu Review", "🟡", 1
+    if row["decision"] == "Layak Bersyarat" and row["loan_requested"] >= 500_000_000:
+        return "Nominal Besar", "💰", 2
+    return None, None, None
+
+
+priority = filtered.copy()
+priority[["reason", "reason_icon", "tier"]] = priority.apply(
+    lambda r: pd.Series(priority_reason(r)), axis=1
 )
+priority = priority.dropna(subset=["tier"]).sort_values(["tier", "risk_score"]).head(5)
 
-p1,p2 = st.columns([1.2,1])
+REASON_COLORS = {
+    "DHN Flag": ("#FCEBEB", "#791F1F"),
+    "Perlu Review": ("#FAEEDA", "#412402"),
+    "Nominal Besar": ("#EAF3DE", "#173404"),
+}
+
+p1, p2 = st.columns([1.2, 1])
 
 with p1:
     with st.container(border=True):
-        st.markdown("#### Top Priority Cases")
-        for _,row in priority.iterrows():
+        chart_title("Top Priority Cases")
+        st.caption("Kasus yang benar-benar butuh tindakan — bukan yang sudah final ditolak.")
+        if priority.empty:
+            st.info("Tidak ada kasus yang perlu diprioritaskan pada filter saat ini.")
+        for _, row in priority.iterrows():
+            bg, fg = REASON_COLORS[row["reason"]]
             st.markdown(
                 f"""
                 <div style='padding:12px;border-bottom:1px solid #E5E7EB'>
-                    <b>{row['company_name']}</b><br>
+                    <span style="font-size:11px;font-weight:700;background:{bg};color:{fg};padding:2px 8px;border-radius:6px;">{row['reason_icon']} {row['reason'].upper()}</span>
+                    <b style="margin-left:6px;">{row['company_name']}</b><br>
                     <span style='color:#64748B'>{row['branch_name']} • {row['industry']}</span><br>
-                    Eligibility Score: <b>{row['risk_score']:.2f}</b> • <span style='color:#DC2626'><b>{row['decision']}</b></span>
+                    Eligibility Score: <b>{row['risk_score']:.2f}</b> • <b>{row['decision']}</b>
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -198,7 +235,7 @@ with p1:
 
 with p2:
     with st.container(border=True):
-        st.markdown("#### Workflow Selanjutnya")
+        chart_title("Workflow Selanjutnya")
 
         st.markdown("""
         **Credit Analyst**
