@@ -6,3 +6,4 @@ scikit-learn==1.9.0
 xgboost==3.4.1
 joblib==1.5.3
 bitsandbytes>=0.46.1
+matplotlib>=3.9
