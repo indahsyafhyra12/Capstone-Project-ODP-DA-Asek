@@ -33,7 +33,7 @@ import streamlit as st
 
 from utils.agent_pipeline import _dukcapil_names, _normalize_name
 from utils.feature_builder import build_features_from_raw, load_raw_tables
-from utils.kwitansi_extractor import compute_monthly_estimates, extract_zip_bytes
+from utils.kwitansi_extractor import build_raw_text_export, compute_monthly_estimates, extract_zip_bytes
 from utils.report_agent import generate_report, get_last_fallback_reason
 from utils.risk_ml_pipeline import apply_policy_engine, predict_credit_screening
 from utils.ui_components import apply_logo
@@ -525,7 +525,15 @@ with tab_manual:
                     "(kolom 'total' kosong) — koreksi manual di tabel di bawah kalau perlu, atau "
                     "biarkan (baris itu tidak akan dihitung ke estimasi)."
                 )
-            preview_df = extracted_df.copy()
+            st.download_button(
+                "⬇️ Download Teks OCR Mentah (.txt)",
+                data=build_raw_text_export(extracted_df),
+                file_name=f"raw_ocr_kwitansi_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                mime="text/plain",
+                help="Transkripsi OCR mentah per file, sebelum di-parse regex — dipakai untuk "
+                     "cek/koreksi kalau ada field yang salah baca atau kosong.",
+            )
+            preview_df = extracted_df.drop(columns=["raw_text"]).copy()
             preview_df.insert(0, "status", np.where(preview_df["total"].isna(), "⚠️ Perlu Dicek", "✅ OK"))
             edited_kwitansi = st.data_editor(
                 preview_df,
@@ -534,7 +542,7 @@ with tab_manual:
                 column_config={
                     "jenis_kwitansi": st.column_config.SelectboxColumn(options=["penjualan", "pembelian"]),
                     "total": st.column_config.NumberColumn(min_value=0, step=1000),
-                    "catatan": st.column_config.TextColumn("Catatan / Teks OCR Mentah", width="large"),
+                    "catatan": st.column_config.TextColumn("Catatan / Teks OCR Mentah (potongan)", width="large"),
                 },
             )
 

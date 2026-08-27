@@ -80,7 +80,7 @@ EXTRACTION_PROMPT = "Extract all the text from this image."
 
 DETAIL_COLUMNS = [
     "source_file", "no_kwitansi", "jenis_kwitansi", "tanggal",
-    "pihak_terkait", "nama_usaha", "nik_pemilik", "total", "catatan",
+    "pihak_terkait", "nama_usaha", "nik_pemilik", "total", "catatan", "raw_text",
 ]
 
 
@@ -225,6 +225,7 @@ def _to_detail_row(result: dict) -> dict:
         "nik_pemilik": result.get("nik_pemilik"),
         "total": result.get("total"),
         "catatan": catatan,
+        "raw_text": raw_text,
     }
     log_variable("detail_row", row)
     return row
@@ -278,6 +279,23 @@ def extract_zip_bytes(zip_bytes: bytes) -> pd.DataFrame:
     )
     log_variable("result_df", result_df.to_dict(orient="records"))
     return result_df
+
+
+def build_raw_text_export(detail_df: pd.DataFrame) -> str:
+    """Gabungkan kolom "raw_text" (transkripsi OCR mentah, sebelum di-regex)
+    semua baris jadi 1 file .txt, dipakai tombol download di halaman
+    Streamlit supaya user bisa cek/kirim persis apa yang dikeluarkan model -
+    dibutuhkan tiap kali regex _parse_receipt_text() perlu disetel ulang
+    krn format kwitansi/transkripsi ternyata beda dari asumsi."""
+    if detail_df is None or detail_df.empty:
+        return ""
+    blocks = []
+    for _, row in detail_df.iterrows():
+        blocks.append(
+            f"===== {row.get('source_file')} =====\n"
+            f"{row.get('raw_text') or ''}\n"
+        )
+    return "\n".join(blocks)
 
 
 def compute_monthly_estimates(detail_df: pd.DataFrame) -> dict:
