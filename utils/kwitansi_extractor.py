@@ -49,6 +49,7 @@ disuntikkan ke pipeline ML (lih. diskusi scope sebelum implementasi).
 from __future__ import annotations
 
 import argparse
+import logging
 import re
 import tempfile
 import zipfile
@@ -58,6 +59,28 @@ import pandas as pd
 import streamlit as st
 
 MODEL_ID = "lightonai/LightOnOCR-2-1B"
+
+_LOG_PATH = Path(__file__).resolve().parents[1] / "log" / "log_kwitansi.txt"
+_LOGGER = logging.getLogger("kwitansi_extractor")
+_LOGGER.setLevel(logging.DEBUG)
+_LOGGER.propagate = False
+if not any(
+    isinstance(handler, logging.FileHandler)
+    and Path(handler.baseFilename).resolve() == _LOG_PATH.resolve()
+    for handler in _LOGGER.handlers
+):
+    _LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _file_handler = logging.FileHandler(_LOG_PATH, encoding="utf-8")
+    _file_handler.setLevel(logging.DEBUG)
+    _file_handler.setFormatter(
+        logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
+    )
+    _LOGGER.addHandler(_file_handler)
+
+
+def log_variable(name: str, value) -> None:
+    """Tulis nama dan nilai variabel ke log kwitansi untuk debugging."""
+    _LOGGER.debug("variable %s = %r", name, value)
 
 # Prompt OCR generik - lihat docstring modul utk alasan kenapa BUKAN prompt
 # custom JSON schema (model ini mengabaikannya, gagal 100% di uji nyata).
@@ -80,6 +103,7 @@ def _load_model():
         MODEL_ID, torch_dtype=dtype
     ).to(device)
     processor = LightOnOcrProcessor.from_pretrained(MODEL_ID)
+    _LOGGER.info("OCR model loaded: model_id=%s device=%s dtype=%s", MODEL_ID, device, dtype)
     return model, processor, device, dtype
 
 
@@ -91,7 +115,9 @@ def extract_one(image_path: Path, model, processor, device, dtype) -> dict:
     tetap dibawa di key "raw_text" utk audit/koreksi manual di preview."""
     from PIL import Image
 
+    _LOGGER.info("extract_one started: file=%s", image_path)
     image = Image.open(image_path).convert("RGB")
+    log_variable("image.size", image.size)
 
     conversation = [
         {
@@ -112,14 +138,19 @@ def extract_one(image_path: Path, model, processor, device, dtype) -> dict:
         k: v.to(device=device, dtype=dtype) if v.is_floating_point() else v.to(device)
         for k, v in inputs.items()
     }
+    log_variable("prompt", prompt)
+    log_variable("input_shapes", {key: tuple(value.shape) for key, value in inputs.items() if hasattr(value, "shape")})
 
     output_ids = model.generate(**inputs, max_new_tokens=512)
     generated_ids = output_ids[0, inputs["input_ids"].shape[1]:]
     raw_text = processor.decode(generated_ids, skip_special_tokens=True).strip()
+    log_variable("raw_text", raw_text)
 
     parsed = _parse_receipt_text(raw_text)
     parsed["source_file"] = image_path.name
     parsed["raw_text"] = raw_text
+    log_variable("parsed_result", parsed)
+    _LOGGER.info("extract_one finished: file=%s", image_path.name)
     return parsed
 
 
@@ -140,6 +171,7 @@ def _parse_receipt_text(raw_text: str) -> dict:
     perlu model tambahan. Field yang tidak ketemu -> None."""
     text = raw_text or ""
     lines = [l.strip() for l in text.splitlines() if l.strip()]
+    log_variable("parse.lines", lines)
 
     jenis_match = _JENIS_RE.search(text)
     jenis_kwitansi = jenis_match.group(1).lower() if jenis_match else None
@@ -170,11 +202,13 @@ def _parse_receipt_text(raw_text: str) -> dict:
         sig_match = _SIGNATURE_NAME_RE.search(lines[-1]) if lines else None
         nama_usaha = sig_match.group(1) if sig_match else None
 
-    return {
+    parsed = {
         "nama_usaha": nama_usaha, "nik_pemilik": nik_pemilik,
         "jenis_kwitansi": jenis_kwitansi, "no_kwitansi": no_kwitansi,
         "tanggal": tanggal, "pihak_terkait": pihak_terkait, "total": total,
     }
+    log_variable("parse.result", parsed)
+    return parsed
 
 
 def _to_detail_row(result: dict) -> dict:
@@ -186,7 +220,7 @@ def _to_detail_row(result: dict) -> dict:
     ]
     catatan = f"Tidak terbaca: {', '.join(missing)}. " if missing else ""
     catatan += f"Teks OCR: {raw_text[:200]}"
-    return {
+    row = {
         "source_file": result.get("source_file"),
         "no_kwitansi": result.get("no_kwitansi"),
         "jenis_kwitansi": result.get("jenis_kwitansi"),
@@ -197,6 +231,8 @@ def _to_detail_row(result: dict) -> dict:
         "total": result.get("total"),
         "catatan": catatan,
     }
+    log_variable("detail_row", row)
+    return row
 
 
 def extract_zip_bytes(zip_bytes: bytes) -> pd.DataFrame:
@@ -212,6 +248,7 @@ def extract_zip_bytes(zip_bytes: bytes) -> pd.DataFrame:
     berisi foto sama sekali - caller diharapkan menampilkan pesan error dan
     TIDAK mengubah field form yang sudah ada (lihat docstring modul).
     """
+    _LOGGER.info("extract_zip_bytes started: zip_bytes=%d bytes", len(zip_bytes))
     try:
         model, processor, device, dtype = _load_model()
     except Exception as e:
@@ -231,6 +268,7 @@ def extract_zip_bytes(zip_bytes: bytes) -> pd.DataFrame:
             p for p in tmp_dir.rglob("*")
             if p.suffix.lower() in [".jpg", ".jpeg", ".png"] and not p.name.startswith(".")
         )
+        log_variable("image_files", [str(path) for path in image_files])
         if not image_files:
             raise ValueError("Tidak ada file gambar (.jpg/.jpeg/.png) di dalam ZIP.")
 
@@ -239,7 +277,10 @@ def extract_zip_bytes(zip_bytes: bytes) -> pd.DataFrame:
             for path in image_files
         ]
 
-    return pd.DataFrame(rows, columns=DETAIL_COLUMNS)
+    result_df = pd.DataFrame(rows, columns=DETAIL_COLUMNS)
+    _LOGGER.info("extract_zip_bytes finished: rows=%d columns=%s", len(result_df), list(result_df.columns))
+    log_variable("result_df", result_df.to_dict(orient="records"))
+    return result_df
 
 
 def compute_monthly_estimates(detail_df: pd.DataFrame) -> dict:
@@ -265,7 +306,12 @@ def compute_monthly_estimates(detail_df: pd.DataFrame) -> dict:
         "monthly_turnover_est": None, "transaction_frequency_monthly": None,
         "n_months": 0, "year_used": None,
     }
+    log_variable(
+        "compute_monthly_estimates.input",
+        None if detail_df is None else detail_df.to_dict(orient="records"),
+    )
     if detail_df is None or detail_df.empty:
+        log_variable("compute_monthly_estimates.result", empty_result)
         return empty_result
 
     valid = detail_df[
@@ -274,12 +320,14 @@ def compute_monthly_estimates(detail_df: pd.DataFrame) -> dict:
         & detail_df["tanggal"].notna()
     ].copy()
     if valid.empty:
+        log_variable("compute_monthly_estimates.result", empty_result)
         return empty_result
 
     valid["total"] = pd.to_numeric(valid["total"], errors="coerce")
     valid["tanggal_dt"] = pd.to_datetime(valid["tanggal"], errors="coerce")
     valid = valid[valid["tanggal_dt"].notna() & valid["total"].notna()]
     if valid.empty:
+        log_variable("compute_monthly_estimates.result", empty_result)
         return empty_result
 
     valid["tahun"] = valid["tanggal_dt"].dt.year
@@ -288,14 +336,18 @@ def compute_monthly_estimates(detail_df: pd.DataFrame) -> dict:
     year_df["bulan"] = year_df["tanggal_dt"].dt.to_period("M")
     n_months = int(year_df["bulan"].nunique())
     if n_months == 0:
+        log_variable("compute_monthly_estimates.result", empty_result)
         return empty_result
 
-    return {
+    estimates = {
         "monthly_turnover_est": round(float(year_df["total"].sum()) / n_months),
         "transaction_frequency_monthly": round(len(year_df) / n_months),
         "n_months": n_months,
         "year_used": year_used,
     }
+    log_variable("compute_monthly_estimates.valid", valid.to_dict(orient="records"))
+    log_variable("compute_monthly_estimates.result", estimates)
+    return estimates
 
 
 # ---------------------------------------------------------------------------
