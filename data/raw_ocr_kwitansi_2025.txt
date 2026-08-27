@@ -1,0 +1,680 @@
+===== kwitansi_001_202401_penjualan.jpg =====
+# UD Susanto Jaya
+
+NIK Pemilik: 3275016008853000  
+Industri: Transportasi - Ekspedisi Kecil
+
+---
+
+## KWITANSI PENJUALAN
+
+No. Kwitansi : KJ-202401-0001  
+Tanggal : 2024-01-24  
+Kepada : Toko Bangunan Makmur
+
+<table>
+  <thead>
+    <tr>
+      <th>Deskripsi</th>
+      <th>Qty</th>
+      <th>Harga Satuan</th>
+      <th>Subtotal</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Ongkos Kirim Cargo Reguler (kg)</td>
+      <td>13</td>
+      <td>Rp 8.000</td>
+      <td>Rp 104.000</td>
+    </tr>
+    <tr>
+      <td>Jasa Ekspedisi Barang Antar Kota (trip)</td>
+      <td>17</td>
+      <td>Rp 436.000</td>
+      <td>Rp 7.412.000</td>
+    </tr>
+    <tr>
+      <td>Jasa Sewa Truk Angkut Barang (hari)</td>
+      <td>7</td>
+      <td>Rp 757.000</td>
+      <td>Rp 5.299.000</td>
+    </tr>
+  </tbody>
+</table>
+
+**TOTAL** Rp 12.815.000
+
+---
+
+Diterima oleh,
+
+( UD Susanto Jaya )
+
+![image](image_1.png)
+
+
+Note: The image placeholder for "LUNAS" is represented with a placeholder URL since the actual image cannot be embedded. In a real scenario, you would replace this with the actual image path or URL.
+
+===== kwitansi_002_202401_penjualan.jpg =====
+# UD Susanto Jaya
+
+NIK Pemilik: 3275016008853000  
+Industri: Transportasi - Ekspedisi Kecil
+
+---
+
+## KWITANSI PENJUALAN
+
+No. Kwitansi : KJ-202401-0002  
+Tanggal : 2024-01-06  
+Kepada : CV Aneka Jaya
+
+<table>
+  <thead>
+    <tr>
+      <th>Deskripsi</th>
+      <th>Qty</th>
+      <th>Harga Satuan</th>
+      <th>Subtotal</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Jasa Pengiriman Ekspres (pengiriman)</td>
+      <td>26</td>
+      <td>Rp 274.000</td>
+      <td>Rp 7.124.000</td>
+    </tr>
+    <tr>
+      <td>Jasa Ekspedisi Barang Antar Kota (trip)</td>
+      <td>15</td>
+      <td>Rp 455.000</td>
+      <td>Rp 6.825.000</td>
+    </tr>
+    <tr>
+      <td>Ongkos Kirim Cargo Reguler (kg)</td>
+      <td>31</td>
+      <td>Rp 15.000</td>
+      <td>Rp 465.000</td>
+    </tr>
+  </tbody>
+</table>
+
+**TOTAL** Rp 14.414.000
+
+---
+
+Diterima oleh,
+
+( UD Susanto Jaya )
+
+<div style="text-align: center;">
+  ![image](image_1.png)
+</div>
+
+===== kwitansi_003_202401_pembelian.jpg =====
+# UD Susanto Jaya
+
+NIK Pemilik: 3275016008853000  
+Industri: Transportasi - Ekspedisi Kecil
+
+---
+
+## KWITANSI PEMBELIAN
+
+No. Kwitansi : KP-202401-0001  
+Tanggal : 2024-01-17  
+Dibeli dari : Bengkel Truk Jaya Motor
+
+<table>
+  <thead>
+    <tr>
+      <th>Deskripsi</th>
+      <th>Qty</th>
+      <th>Harga Satuan</th>
+      <th>Subtotal</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Solar Industri (BBM Armada) (liter)</td>
+      <td>29</td>
+      <td>Rp 14.000</td>
+      <td>Rp 406.000</td>
+    </tr>
+    <tr>
+      <td>Ban Truk (unit)</td>
+      <td>25</td>
+      <td>Rp 1.447.000</td>
+      <td>Rp 36.175.000</td>
+    </tr>
+    <tr>
+      <td>Retribusi Tol & Terminal (trip)</td>
+      <td>7</td>
+      <td>Rp 109.000</td>
+      <td>Rp 763.000</td>
+    </tr>
+  </tbody>
+</table>
+
+**TOTAL** Rp 37.344.000
+
+---
+
+Diterima oleh,
+
+( UD Susanto Jaya )
+
+![image](image_1.png)
+
+
+Note: The image placeholder for "LUNAS" is represented with a placeholder URL since the actual image cannot be embedded. In a real scenario, you would replace this with the actual image path or URL.
+
+===== kwitansi_004_202401_pembelian.jpg =====
+# UD Susanto Jaya
+
+NIK Pemilik: 3275016008853000  
+Industri: Transportasi - Ekspedisi Kecil
+
+---
+
+## KWITANSI PEMBELIAN
+
+No. Kwitansi : KP-202401-0002  
+Tanggal : 2024-01-14  
+Dibeli dari : SPBU Pertamina 34.123.45
+
+<table>
+  <thead>
+    <tr>
+      <th>Deskripsi</th>
+      <th>Qty</th>
+      <th>Harga Satuan</th>
+      <th>Subtotal</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Spare Part Rem & Kopling (set)</td>
+      <td>13</td>
+      <td>Rp 418.000</td>
+      <td>Rp 5.434.000</td>
+    </tr>
+    <tr>
+      <td>Biaya Service Kendaraan (kali)</td>
+      <td>9</td>
+      <td>Rp 361.000</td>
+      <td>Rp 3.249.000</td>
+    </tr>
+    <tr>
+      <td>Oli Mesin Truk (liter)</td>
+      <td>12</td>
+      <td>Rp 75.000</td>
+      <td>Rp 900.000</td>
+    </tr>
+    <tr>
+      <td>Ban Truk (unit)</td>
+      <td>28</td>
+      <td>Rp 983.000</td>
+      <td>Rp 27.524.000</td>
+    </tr>
+  </tbody>
+</table>
+
+**TOTAL** Rp 37.107.000
+
+---
+
+Diterima oleh,
+
+( UD Susanto Jaya )
+
+<div style="border: 2px solid green; border-radius: 50%; padding: 5px; display: inline-block;">
+  <span style="font-size: 24px; font-weight: bold; color: green
+
+===== kwitansi_005_202402_penjualan.jpg =====
+# UD Susanto Jaya
+
+NIK Pemilik: 3275016008853000  
+Industri: Transportasi - Ekspedisi Kecil
+
+---
+
+## KWITANSI PENJUALAN
+
+No. Kwitansi : KJ-202402-0001  
+Tanggal : 2024-02-12  
+Kepada : PT Sumber Rejeki
+
+<table>
+  <thead>
+    <tr>
+      <th>Deskripsi</th>
+      <th>Qty</th>
+      <th>Harga Satuan</th>
+      <th>Subtotal</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Jasa Pengiriman Paket Jakarta-Bandung (pengi30</td>
+      <td></td>
+      <td>Rp 147.206</td>
+      <td>Rp 4.416.180</td>
+    </tr>
+    <tr>
+      <td>Jasa Ekspedisi Barang Antar Kota (trip)</td>
+      <td>27</td>
+      <td>Rp 435.528</td>
+      <td>Rp 11.759.256</td>
+    </tr>
+  </tbody>
+</table>
+
+**TOTAL** Rp 16.175.436
+
+---
+
+Diterima oleh,
+
+( UD Susanto Jaya )
+
+![image](image_1.png)
+
+
+Note: The image placeholder for "LUNAS" is represented with a generic placeholder URL since the actual image cannot be embedded. In a real scenario, you would replace this with the actual image URL or base64 data.
+
+===== kwitansi_006_202402_penjualan.jpg =====
+# UD Susanto Jaya
+
+NIK Pemilik: 3275016008853000  
+Industri: Transportasi - Ekspedisi Kecil
+
+---
+
+## KWITANSI PENJUALAN
+
+No. Kwitansi : KJ-202402-0002  
+Tanggal : 2024-02-07  
+Kepada : CV Aneka Jaya
+
+<table>
+  <thead>
+    <tr>
+      <th>Deskripsi</th>
+      <th>Qty</th>
+      <th>Harga Satuan</th>
+      <th>Subtotal</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Jasa Pengiriman Paket Jakarta-Bandung (pengill</td>
+      <td></td>
+      <td>Rp 157.358</td>
+      <td>Rp 1.730.938</td>
+    </tr>
+    <tr>
+      <td>Jasa Pengiriman Ekspres (pengiriman)</td>
+      <td>13</td>
+      <td>Rp 147.206</td>
+      <td>Rp 1.913.678</td>
+    </tr>
+    <tr>
+      <td>Ongkos Kirim Cargo Reguler (kg)</td>
+      <td>28</td>
+      <td>Rp 7.106</td>
+      <td>Rp 198.968</td>
+    </tr>
+    <tr>
+      <td colspan="3" style="text-align: right;"><strong>TOTAL</strong></td>
+      <td><strong>Rp 3.843.584</strong></td>
+    </tr>
+  </tbody>
+</table>
+
+Diterima oleh,
+
+( UD Susanto Jaya )
+
+<div style="text-align: center;">
+  ![image](image_1.png)
+</div>
+
+===== kwitansi_007_202402_pembelian.jpg =====
+# UD Susanto Jaya
+
+NIK Pemilik: 3275016008853000  
+Industri: Transportasi - Ekspedisi Kecil
+
+---
+
+## KWITANSI PEMBELIAN
+
+No. Kwitansi : KP-202402-0001  
+Tanggal : 2024-02-11  
+Dibeli dari : Bengkel Truk Jaya Motor
+
+<table>
+  <thead>
+    <tr>
+      <th>Deskripsi</th>
+      <th>Qty</th>
+      <th>Harga Satuan</th>
+      <th>Subtotal</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Retribusi Tol & Terminal (trip)</td>
+      <td>34</td>
+      <td>Rp 87.308</td>
+      <td>Rp 2.968.472</td>
+    </tr>
+    <tr>
+      <td>Solar Industri (BBM Armada) (liter)</td>
+      <td>2</td>
+      <td>Rp 13.197</td>
+      <td>Rp 26.394</td>
+    </tr>
+  </tbody>
+</table>
+
+**TOTAL** Rp 2.994.866
+
+---
+
+Diterima oleh,
+
+( UD Susanto Jaya )
+
+![image](image_1.png)
+
+
+Note: The image placeholder for "LUNAS" is represented with a generic placeholder URL since the actual image cannot be embedded. In a real scenario, you would replace this with the actual image URL or base64 data.
+
+===== kwitansi_008_202402_pembelian.jpg =====
+# UD Susanto Jaya
+
+NIK Pemilik: 3275016008853000  
+Industri: Transportasi - Ekspedisi Kecil
+
+---
+
+## KWITANSI PEMBELIAN
+
+No. Kwitansi : KP-202402-0002  
+Tanggal : 2024-02-08  
+Dibeli dari : Toko Spare Part Sumber Baru
+
+<table>
+  <thead>
+    <tr>
+      <th>Deskripsi</th>
+      <th>Qty</th>
+      <th>Harga Satuan</th>
+      <th>Subtotal</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Oli Mesin Truk (liter)</td>
+      <td>25</td>
+      <td>Rp 84.263</td>
+      <td>Rp 2.106.575</td>
+    </tr>
+    <tr>
+      <td>Solar Industri (BBM Armada) (liter)</td>
+      <td>27</td>
+      <td>Rp 16.243</td>
+      <td>Rp 438.561</td>
+    </tr>
+  </tbody>
+</table>
+
+**TOTAL** Rp 2.545.136
+
+---
+
+Diterima oleh,
+
+( UD Susanto Jaya )
+
+<div style="text-align: center;">
+  <div style="border: 2px solid green; border-radius: 50%; padding: 10px; display: inline-block;">
+    <strong>LUNAS</strong>
+  </div>
+</div>
+
+===== kwitansi_009_202403_penjualan.jpg =====
+# UD Susanto Jaya
+
+NIK Pemilik: 3275016008853000  
+Industri: Transportasi - Ekspedisi Kecil
+
+---
+
+## KWITANSI PENJUALAN
+
+No. Kwitansi : KJ-202403-0001  
+Tanggal : 2024-03-14  
+Kepada : PT Cipta Boga Nusantara
+
+<table>
+  <thead>
+    <tr>
+      <th>Deskripsi</th>
+      <th>Qty</th>
+      <th>Harga Satuan</th>
+      <th>Subtotal</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Jasa Ekspedisi Barang Antar Kota (trip)</td>
+      <td>20</td>
+      <td>Rp 770.765</td>
+      <td>Rp 15.415.300</td>
+    </tr>
+    <tr>
+      <td>Ongkos Kirim Cargo Reguler (kg)</td>
+      <td>7</td>
+      <td>Rp 12.365</td>
+      <td>Rp 86.555</td>
+    </tr>
+  </tbody>
+</table>
+
+**TOTAL** Rp 15.501.855
+
+---
+
+Diterima oleh,
+
+( UD Susanto Jaya )
+
+<div style="text-align: center;">
+  ![image](image_1.png)
+</div>
+
+===== kwitansi_010_202403_penjualan.jpg =====
+# UD Susanto Jaya
+
+NIK Pemilik: 3275016008853000  
+Industri: Transportasi - Ekspedisi Kecil
+
+---
+
+## KWITANSI PENJUALAN
+
+No. Kwitansi : KJ-202403-0002  
+Tanggal : 2024-03-13  
+Kepada : CV Aneka Jaya
+
+<table>
+  <thead>
+    <tr>
+      <th>Deskripsi</th>
+      <th>Qty</th>
+      <th>Harga Satuan</th>
+      <th>Subtotal</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Ongkos Kirim Cargo Reguler (kg)</td>
+      <td>12</td>
+      <td>Rp 9.273</td>
+      <td>Rp 111.276</td>
+    </tr>
+    <tr>
+      <td>Jasa Sewa Truk Angkut Barang (hari)</td>
+      <td>26</td>
+      <td>Rp 1.230.339</td>
+      <td>Rp 31.988.814</td>
+    </tr>
+    <tr>
+      <td>Jasa Ekspedisi Barang Antar Kota (trip)</td>
+      <td>30</td>
+      <td>Rp 514.186</td>
+      <td>Rp 15.425.580</td>
+    </tr>
+  </tbody>
+</table>
+
+**TOTAL** Rp 47.525.670
+
+---
+
+Diterima oleh,
+
+( UD Susanto Jaya )
+
+<div style="text-align: center;">
+  ![image](image_1.png)
+</div>
+
+===== kwitansi_011_202403_pembelian.jpg =====
+# UD Susanto Jaya
+
+NIK Pemilik: 3275016008853000  
+Industri: Transportasi - Ekspedisi Kecil
+
+---
+
+## KWITANSI PEMBELIAN
+
+No. Kwitansi : KP-202403-0001  
+Tanggal : 2024-03-04  
+Dibeli dari : Bengkel Mitra Truk
+
+<table>
+  <thead>
+    <tr>
+      <th>Deskripsi</th>
+      <th>Qty</th>
+      <th>Harga Satuan</th>
+      <th>Subtotal</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Retribusi Tol & Terminal (trip)</td>
+      <td>28</td>
+      <td>Rp 149.413</td>
+      <td>Rp 4.183.564</td>
+    </tr>
+    <tr>
+      <td>Oli Mesin Truk (liter)</td>
+      <td>16</td>
+      <td>Rp 75.221</td>
+      <td>Rp 1.203.536</td>
+    </tr>
+    <tr>
+      <td>Ban Truk (unit)</td>
+      <td>24</td>
+      <td>Rp 1.619.843</td>
+      <td>Rp 38.876.232</td>
+    </tr>
+    <tr>
+      <td>Spare Part Rem & Kopling (set)</td>
+      <td>27</td>
+      <td>Rp 413.204</td>
+      <td>Rp 11.156.508</td>
+    </tr>
+  </tbody>
+</table>
+
+**TOTAL** Rp 55.419.840
+
+---
+
+Diterima oleh,
+
+( UD Susanto Jaya )
+
+![image](image_1.png)
+
+
+Note: The image placeholder for the "LUNAS" logo is represented with a placeholder URL since the actual image cannot be embedded in Markdown. In a real scenario, you would replace this with the actual image path or URL
+
+===== kwitansi_012_202403_pembelian.jpg =====
+# UD Susanto Jaya
+
+NIK Pemilik: 3275016008853000  
+Industri: Transportasi - Ekspedisi Kecil
+
+---
+
+## KWITANSI PEMBELIAN
+
+No. Kwitansi : KP-202403-0002  
+Tanggal : 2024-03-26  
+Dibeli dari : Toko Spare Part Sumber Baru
+
+<table>
+  <thead>
+    <tr>
+      <th>Deskripsi</th>
+      <th>Qty</th>
+      <th>Harga Satuan</th>
+      <th>Subtotal</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Spare Part Rem & Kopling (set)</td>
+      <td>28</td>
+      <td>Rp 658.447</td>
+      <td>Rp 18.436.516</td>
+    </tr>
+    <tr>
+      <td>Oli Mesin Truk (liter)</td>
+      <td>35</td>
+      <td>Rp 82.434</td>
+      <td>Rp 2.885.190</td>
+    </tr>
+    <tr>
+      <td>Ban Truk (unit)</td>
+      <td>20</td>
+      <td>Rp 1.138.630</td>
+      <td>Rp 22.772.600</td>
+    </tr>
+    <tr>
+      <td>Retribusi Tol & Terminal (trip)</td>
+      <td>3</td>
+      <td>Rp 64.917</td>
+      <td>Rp 194.751</td>
+    </tr>
+  </tbody>
+</table>
+
+**TOTAL** Rp 44.289.057
+
+---
+
+<div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 50px;">
+  <div>
+    <div style="border: 2px solid green; border-radius: 50%; padding: 10px; display: inline-block;">
+      <strong>L

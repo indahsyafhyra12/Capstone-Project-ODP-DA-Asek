@@ -142,7 +142,10 @@ def extract_one(image_path: Path, model, processor, device, dtype) -> dict:
     log_variable("prompt", prompt)
     log_variable("input_shapes", {key: tuple(value.shape) for key, value in inputs.items() if hasattr(value, "shape")})
 
-    output_ids = model.generate(**inputs, max_new_tokens=512)
+    # 512 diverifikasi mepet di data uji nyata (kwitansi dgn >=4 baris item +
+    # markup Markdown/HTML/stempel LUNAS bisa kepotong sebelum TOTAL keluar) -
+    # 768 kasih margin tanpa menambah latency signifikan.
+    output_ids = model.generate(**inputs, max_new_tokens=768)
     generated_ids = output_ids[0, inputs["input_ids"].shape[1]:]
     raw_text = processor.decode(generated_ids, skip_special_tokens=True).strip()
     print("\n===== RAW_TEXT OCR START =====")
@@ -167,13 +170,36 @@ _NIK_RE = re.compile(r"NIK\s*Pemilik\s*[:=]?\s*(\d+)", re.IGNORECASE)
 _TOTAL_RE = re.compile(r"\bTOTAL\b\s*[:=\-]?\s*Rp\.?\s*([\d.,]+)", re.IGNORECASE)
 _SIGNATURE_NAME_RE = re.compile(r"\(\s*([^)\n]+?)\s*\)\s*$")
 
+# LightOnOCR-2-1B ternyata mentranskripsi sbg Markdown (kadang HTML utk tabel),
+# BUKAN teks polos - "**TOTAL**" (bold) & "<td><strong>TOTAL</strong></td>...
+# <td><strong>Rp X</strong></td>" (total di sel tabel terpisah dari nominal)
+# diverifikasi di data uji nyata (20 kwitansi asli, lihat riwayat diskusi).
+# Tanpa normalisasi ini, "**"/tag HTML di antara "TOTAL" dan "Rp X" mencegah
+# _TOTAL_RE nyambung -> total selalu None. Regex field lain di atas dibiarkan
+# beroperasi di teks yang SUDAH dinormalisasi (bukan raw_text asli).
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+_MD_HEADING_RE = re.compile(r"^#+\s*", re.MULTILINE)
+_MD_EMPHASIS_RE = re.compile(r"[*_`]")
+
+
+def _normalize_ocr_text(raw_text: str) -> str:
+    """Bersihkan markup Markdown/HTML dari hasil transkripsi OCR supaya
+    regex field (jenis/tanggal/total/dst.) tidak putus gara-gara "**TOTAL**"
+    atau total yang ditulis di sel <td> terpisah dari nominalnya."""
+    text = raw_text or ""
+    text = _HTML_TAG_RE.sub(" ", text)  # ganti tag jadi spasi, bukan dihapus -
+    text = _MD_HEADING_RE.sub("", text)  # ("...</td><td>..." jangan nempel jadi 1 token)
+    text = _MD_EMPHASIS_RE.sub("", text)
+    return text
+
 
 def _parse_receipt_text(raw_text: str) -> dict:
-    """Strukturkan hasil transkripsi OCR polos (EXTRACTION_PROMPT) jadi field
-    kwitansi, mengandalkan format kwitansi yang konsisten (lihat docstring
-    modul) - bukan LLM/model kedua, murni regex supaya deterministik & tidak
-    perlu model tambahan. Field yang tidak ketemu -> None."""
-    text = raw_text or ""
+    """Strukturkan hasil transkripsi OCR (Markdown/HTML - lihat
+    _normalize_ocr_text()) jadi field kwitansi, mengandalkan format kwitansi
+    yang konsisten (lihat docstring modul) - bukan LLM/model kedua, murni
+    regex supaya deterministik & tidak perlu model tambahan. Field yang
+    tidak ketemu -> None."""
+    text = _normalize_ocr_text(raw_text)
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     log_variable("parse.lines", lines)
 
