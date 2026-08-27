@@ -26,14 +26,9 @@ inject_css()
 # ==========================================================
 # PLACEHOLDER PAGES
 # ==========================================================
-
-def rm_page():
-    st.title("🏆 RM Performance")
-    st.info("Coming Soon")
-
-def industry_page():
-    st.title("🏭 Industry Intelligence")
-    st.info("Coming Soon")
+# rm_page() dan industry_page() dihapus — udah ada halaman beneran di
+# pages_v2/05_RM_Performance_Premium.py dan
+# pages_v2/06_Laporan_Keuangan_Kwitansi_Premium.py
 
 # ==========================================================
 # NAVIGATION
@@ -72,15 +67,15 @@ pg = st.navigation([
     ),
 
     st.Page(
-        rm_page,
+        "pages_v2/05_RM_Performance_Premium.py",
         title="RM Performance",
         icon="🏆"
     ),
 
     st.Page(
-        industry_page,
-        title="Industry Intelligence",
-        icon="🏭"
+        "pages_v2/06_Laporan_Keuangan_Kwitansi_Premium.py",
+        title="Generate Laporan Keuangan",
+        icon="🧾"
     )
 ])
 

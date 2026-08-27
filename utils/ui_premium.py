@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 
 # ==========================================================
 # WONDR COLOR PALETTE
@@ -51,6 +50,23 @@ def inject_css():
         padding-top:1.2rem;
         padding-bottom:2rem;
         font-family:'Inter','Segoe UI',sans-serif;
+    }
+
+    /* ======================================================
+       ST.METRIC() — dipakai di beberapa halaman (Detail Nasabah,
+       dst.) buat data ringkas. Default Streamlit gede banget
+       (~32px value), disamain ke skala chart-title/kpi-value.
+    ====================================================== */
+
+    [data-testid="stMetricValue"]{
+        font-size:18px !important;
+        font-weight:700 !important;
+        color:#1F2937 !important;
+    }
+
+    [data-testid="stMetricLabel"]{
+        font-size:11px !important;
+        color:#6B7280 !important;
     }
 
     html, body, [class*="css"]{
@@ -295,6 +311,76 @@ def inject_css():
         margin-bottom:8px;
     }
 
+    /* ======================================================
+       HERO BANNER
+    ====================================================== */
+
+    .hero-banner{
+        position:relative;
+        background:#F3650B;
+        border-radius:18px;
+        padding:22px 28px;
+        margin-top:12px;
+        color:white;
+        overflow:hidden;
+        box-sizing:border-box;
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:16px;
+        margin-bottom:16px;
+    }
+
+    .hero-banner-circle{
+        position:absolute;
+        right:-30px;
+        top:-30px;
+        width:150px;
+        height:150px;
+        border-radius:50%;
+        background:rgba(255,255,255,.08);
+    }
+
+    .hero-banner-left{
+        display:flex;
+        align-items:center;
+        gap:16px;
+        z-index:2;
+        min-width:0;
+    }
+
+    .hero-banner-icon{
+        width:54px;
+        height:54px;
+        border-radius:14px;
+        background:rgba(255,255,255,.18);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:28px;
+        flex-shrink:0;
+    }
+
+    .hero-banner-title{
+        font-size:22px;
+        font-weight:800;
+        line-height:1.25;
+    }
+
+    .hero-banner-subtitle{
+        margin-top:4px;
+        font-size:13px;
+        line-height:1.4;
+        opacity:.95;
+    }
+
+    .hero-banner-badge{
+        font-size:20px;
+        font-weight:800;
+        z-index:2;
+        flex-shrink:0;
+    }
+
     </style>
     """, unsafe_allow_html=True)
 
@@ -303,69 +389,27 @@ def inject_css():
 # HERO BANNER
 # ==========================================================
 def hero_banner(title, subtitle):
-
-    html = f"""
-    <div style="
-        position:relative;
-        background:#F3650B;
-        border-radius:18px;
-        padding:22px 28px;
-        color:white;
-        font-family:'Inter',Arial,sans-serif;
-        overflow:hidden;
-        height:110px;
-        box-sizing:border-box;
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        gap:16px;
-    ">
-
-        <div style="
-            position:absolute;
-            right:-30px;
-            top:-30px;
-            width:150px;
-            height:150px;
-            border-radius:50%;
-            background:rgba(255,255,255,.08);
-        "></div>
-
-        <div style="display:flex; align-items:center; gap:16px; z-index:2; min-width:0;">
-
-            <div style="
-                width:54px;
-                height:54px;
-                border-radius:14px;
-                background:rgba(255,255,255,.18);
-                display:flex;
-                align-items:center;
-                justify-content:center;
-                font-size:28px;
-                flex-shrink:0;
-            ">
-                🏦
-            </div>
-
-            <div style="min-width:0;">
-                <div style="font-size:24px; font-weight:800; line-height:1.2; white-space:nowrap;">
-                    {title}
-                </div>
-                <div style="margin-top:4px; font-size:13px; line-height:1.4; opacity:.95;">
-                    {subtitle}
-                </div>
-            </div>
-
-        </div>
-
-        <div style="font-size:20px; font-weight:800; z-index:2; flex-shrink:0;">
-            BNI
-        </div>
-
-    </div>
-    """
-
-    components.html(html, height=120)
+    # PENTING: sebelumnya pakai components.html() yang render di iframe
+    # terpisah — elemen di dalam iframe ga bisa position:sticky ke scroll
+    # halaman utama Streamlit (iframe punya scroll context sendiri).
+    # Diganti st.markdown() biar jadi bagian asli halaman, baru sticky-nya
+    # beneran nempel pas discroll.
+    #
+    # HTML ini sengaja ditulis flush-left tanpa baris kosong (concatenation
+    # string), sama kayak status card di sidebar — kalau ada baris kosong +
+    # indentasi, Markdown salah baca ini sebagai code block, bukan HTML.
+    html = (
+        '<div class="hero-banner">'
+        '<div class="hero-banner-circle"></div>'
+        '<div class="hero-banner-left">'
+        '<div class="hero-banner-icon">🏦</div>'
+        f'<div><div class="hero-banner-title">{title}</div>'
+        f'<div class="hero-banner-subtitle">{subtitle}</div></div>'
+        '</div>'
+        '<div class="hero-banner-badge">BNI</div>'
+        '</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
 
 
 # ==========================================================
