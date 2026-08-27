@@ -33,6 +33,7 @@ import streamlit as st
 
 from utils.agent_pipeline import _dukcapil_names, _normalize_name
 from utils.feature_builder import build_features_from_raw, load_raw_tables
+from utils.kwitansi_extractor import compute_monthly_estimates, extract_zip_bytes
 from utils.report_agent import generate_report, get_last_fallback_reason
 from utils.risk_ml_pipeline import apply_policy_engine, predict_credit_screening
 from utils.ui_components import apply_logo
@@ -477,6 +478,96 @@ with tab_manual:
     industry = st.selectbox("Industri", INDUSTRY_OPTIONS, index=sb_index(INDUSTRY_OPTIONS, "industry", INDUSTRY_OPTIONS[0]), key="f_industry")
     sub_industry_options = INDUSTRY_SUBINDUSTRY.get(industry, [])
 
+    st.markdown('<div class="section-title">💰 Profil Finansial</div>', unsafe_allow_html=True)
+    fin_mode = st.radio(
+        "Mode Input Profil Finansial", ["Isi Manual", "Upload Kwitansi (ZIP)"],
+        horizontal=True, key="_fin_input_mode", label_visibility="collapsed",
+    )
+
+    if fin_mode == "Upload Kwitansi (ZIP)":
+        st.caption(
+            "Upload 1 file **.zip** berisi foto kwitansi penjualan & pembelian usaha yang sedang "
+            "diajukan (boleh campur jenisnya, untuk satu nasabah). Hasil ekstraksi bisa dicek/"
+            "dikoreksi dulu di tabel sebelum dipakai mengisi Estimasi Omset Bulanan & Frekuensi "
+            "Transaksi/Bulan di bawah — Nominal Pinjaman dan Estimasi DSR tetap diisi manual."
+        )
+        kwitansi_zip = st.file_uploader("File Kwitansi (.zip)", type=["zip"], key="_kwitansi_zip")
+
+        if kwitansi_zip is not None and st.session_state.get("_kwitansi_zip_name") != kwitansi_zip.name:
+            st.session_state["_kwitansi_zip_name"] = kwitansi_zip.name
+            st.session_state.pop("_kwitansi_extracted", None)
+            st.session_state.pop("_kwitansi_confirmed", None)
+            with st.spinner(
+                "Membaca kwitansi dengan model OCR (LightOnOCR-2-1B) — pemuatan model pertama kali "
+                "bisa memakan waktu beberapa menit, proses berikutnya lebih cepat..."
+            ):
+                try:
+                    st.session_state["_kwitansi_extracted"] = extract_zip_bytes(kwitansi_zip.getvalue())
+                except Exception as e:
+                    st.session_state["_kwitansi_error"] = str(e)
+            if "_kwitansi_extracted" in st.session_state:
+                st.session_state.pop("_kwitansi_error", None)
+
+        if st.session_state.get("_kwitansi_error"):
+            st.error(
+                f"Gagal memproses ZIP kwitansi: {st.session_state['_kwitansi_error']}. "
+                "Field Profil Finansial TIDAK diubah — silakan upload ulang ZIP yang valid, "
+                "atau ganti ke mode **Isi Manual**."
+            )
+
+        extracted_df = st.session_state.get("_kwitansi_extracted")
+        if extracted_df is not None and not extracted_df.empty:
+            n_gagal = extracted_df["total"].isna().sum()
+            st.markdown("**Preview Hasil Ekstraksi Kwitansi**")
+            if n_gagal:
+                st.warning(
+                    f"⚠️ {n_gagal} dari {len(extracted_df)} kwitansi gagal terbaca lengkap "
+                    "(kolom 'total' kosong) — koreksi manual di tabel di bawah kalau perlu, atau "
+                    "biarkan (baris itu tidak akan dihitung ke estimasi)."
+                )
+            preview_df = extracted_df.copy()
+            preview_df.insert(0, "status", np.where(preview_df["total"].isna(), "⚠️ Perlu Dicek", "✅ OK"))
+            edited_kwitansi = st.data_editor(
+                preview_df.drop(columns=["catatan"]),
+                use_container_width=True, hide_index=True, key="_kwitansi_editor",
+                disabled=["status", "source_file"],
+                column_config={
+                    "jenis_kwitansi": st.column_config.SelectboxColumn(options=["penjualan", "pembelian"]),
+                    "total": st.column_config.NumberColumn(min_value=0, step=1000),
+                },
+            )
+
+            if st.button("✅ Gunakan hasil ini untuk isi Profil Finansial", type="primary"):
+                estimates = compute_monthly_estimates(edited_kwitansi)
+                if estimates["monthly_turnover_est"] is None:
+                    st.error(
+                        "Tidak ada kwitansi 'penjualan' dengan total & tanggal lengkap untuk dihitung. "
+                        "Field Profil Finansial TIDAK diubah — lengkapi tabel di atas, atau gunakan "
+                        "mode **Isi Manual**."
+                    )
+                else:
+                    st.session_state["f_monthly_turnover_est"] = estimates["monthly_turnover_est"]
+                    st.session_state["f_transaction_frequency_monthly"] = estimates["transaction_frequency_monthly"]
+                    st.session_state["_kwitansi_confirmed"] = True
+                    st.success(
+                        f"Terisi dari {estimates['n_months']} bulan data kwitansi tahun {estimates['year_used']}: "
+                        f"Estimasi Omset Bulanan ≈ Rp {estimates['monthly_turnover_est']:,.0f}, "
+                        f"Frekuensi Transaksi/Bulan ≈ {estimates['transaction_frequency_monthly']}. "
+                        "Cek nilainya di form Profil Finansial di bawah."
+                    )
+                    st.rerun()
+        elif extracted_df is not None and extracted_df.empty:
+            st.error(
+                "ZIP tidak berisi kwitansi yang bisa diproses. Field Profil Finansial TIDAK diubah "
+                "— silakan gunakan mode **Isi Manual**."
+            )
+
+        if st.session_state.get("_kwitansi_confirmed"):
+            st.info(
+                "✔️ Estimasi Omset Bulanan & Frekuensi Transaksi/Bulan sudah terisi dari kwitansi "
+                "di form di bawah — Nominal Pinjaman & Estimasi DSR tetap perlu diisi manual."
+            )
+
     with st.form("manual_form"):
         st.markdown('<div class="section-title">👤 Identitas & Profil Usaha</div>', unsafe_allow_html=True)
         c1, c2, c3 = st.columns(3)
@@ -513,7 +604,8 @@ with tab_manual:
             district = st.text_input("Kecamatan (lokasi usaha)", value=sv("district", ""))
         region = st.selectbox("Region", REGION_OPTIONS, index=sb_index(REGION_OPTIONS, "region", REGION_OPTIONS[0]))
 
-        st.markdown('<div class="section-title">💰 Profil Finansial</div>', unsafe_allow_html=True)
+        st.divider()
+        st.caption("💰 **Profil Finansial** (mode input dipilih di atas, sebelum form ini).")
         c10, c11, c12 = st.columns(3)
         with c10:
             monthly_turnover_est = st.number_input("Estimasi Omset Bulanan (Rp)", min_value=1_000_000, value=int(sv("monthly_turnover_est", 50_000_000)), step=1_000_000)
