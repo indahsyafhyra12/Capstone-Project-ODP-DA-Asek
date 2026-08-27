@@ -1,7 +1,16 @@
-"""Kwitansi Extractor — OCR ekstraksi kwitansi penjualan/pembelian dari file
-.zip pakai model VLM lokal LightOnOCR-2-1B, dipakai fitur "Upload Kwitansi
-(ZIP)" di pages_v2/03_Pengajuan_Credit_Baru_Premium.py untuk auto-fill
-section Profil Finansial.
+"""Kwitansi Extractor — OCR ekstraksi kwitansi penjualan/pembelian pakai
+model VLM lokal LightOnOCR-2-1B, load in-process (bukan endpoint remote) -
+diasumsikan app jalan di server/VM dgn GPU/RAM cukup, BUKAN Streamlit
+Community Cloud yang RAM/CPU-nya terbatas utk load model ~2GB langsung.
+
+Dipakai dari 2 halaman:
+  - pages_v2/03_Pengajuan_Credit_Baru_Premium.py (extract_zip_bytes) - upload
+    1 file .zip kwitansi utk 1 nasabah yang sedang diajukan, auto-fill 2
+    field Profil Finansial (monthly_turnover_est/transaction_frequency_
+    monthly), TIDAK menyimpan hasil kemana pun.
+  - pages_v2/06_Laporan_Keuangan_Kwitansi_Premium.py (extract_uploaded_files)
+    - upload beberapa foto kwitansi individual (bukan zip) utk nasabah yang
+    SUDAH ADA di sistem, generate laporan omset/pembelian/profit per tahun.
 
 Dipindah dari Resources_Pendukung/extract_kwitansi.py (dulu script CLI
 mandiri), loading model dipisah jadi _load_model() (lazy import torch/
@@ -231,11 +240,42 @@ def _to_detail_row(result: dict) -> dict:
     return row
 
 
+def _extract_paths(image_paths: list) -> pd.DataFrame:
+    """Loop bersama dipakai extract_zip_bytes() & extract_uploaded_files():
+    load model sekali (@st.cache_resource), proses tiap path lewat
+    extract_one(). Kegagalan per-file (mis. file gambar korup) dicatat di
+    kolom "catatan" alih-alih menghentikan seluruh batch - konsisten dgn
+    prinsip "kwitansi lain tetap diproses" di extract_one()."""
+    try:
+        model, processor, device, dtype = _load_model()
+    except Exception as e:
+        raise RuntimeError(f"Model OCR gagal dimuat ({type(e).__name__}): {e}") from e
+
+    rows = []
+    for path in image_paths:
+        try:
+            row = _to_detail_row(extract_one(path, model, processor, device, dtype))
+        except Exception as e:
+            row = {
+                "source_file": path.name, "no_kwitansi": None, "jenis_kwitansi": None,
+                "tanggal": None, "pihak_terkait": None, "nama_usaha": None,
+                "nik_pemilik": None, "total": None,
+                "catatan": f"Gagal diproses ({type(e).__name__}): {e}", "raw_text": None,
+            }
+        rows.append(row)
+
+    result_df = pd.DataFrame(rows, columns=DETAIL_COLUMNS)
+    debug_print(f"_extract_paths finished: rows={len(result_df)} columns={list(result_df.columns)}")
+    log_variable("result_df", result_df.to_dict(orient="records"))
+    return result_df
+
+
 def extract_zip_bytes(zip_bytes: bytes) -> pd.DataFrame:
-    """Dipakai halaman Streamlit: terima isi file .zip (dari
-    st.file_uploader.getvalue()), jalankan OCR ke semua foto di dalamnya,
-    kembalikan 1 baris per kwitansi (kolom DETAIL_COLUMNS) untuk preview/
-    koreksi manual SEBELUM dipakai isi form.
+    """Dipakai halaman Streamlit yang upload 1 file .zip berisi kwitansi
+    (mis. pages_v2/03_Pengajuan_Credit_Baru_Premium.py): terima isi file
+    .zip (dari st.file_uploader.getvalue()), jalankan OCR ke semua foto di
+    dalamnya, kembalikan 1 baris per kwitansi (kolom DETAIL_COLUMNS) untuk
+    preview/koreksi manual SEBELUM dipakai isi form.
 
     Model di-load sekali lewat @st.cache_resource - baris pertama yang berat
     ada di sini, sebaiknya dipanggil di dalam st.spinner() oleh caller.
@@ -245,10 +285,6 @@ def extract_zip_bytes(zip_bytes: bytes) -> pd.DataFrame:
     TIDAK mengubah field form yang sudah ada (lihat docstring modul).
     """
     debug_print(f"extract_zip_bytes started: zip_bytes={len(zip_bytes)} bytes")
-    try:
-        model, processor, device, dtype = _load_model()
-    except Exception as e:
-        raise RuntimeError(f"Model OCR gagal dimuat ({type(e).__name__}): {e}") from e
 
     with tempfile.TemporaryDirectory(prefix="kwitansi_") as tmp_dir_str:
         tmp_dir = Path(tmp_dir_str)
@@ -268,17 +304,32 @@ def extract_zip_bytes(zip_bytes: bytes) -> pd.DataFrame:
         if not image_files:
             raise ValueError("Tidak ada file gambar (.jpg/.jpeg/.png) di dalam ZIP.")
 
-        rows = [
-            _to_detail_row(extract_one(path, model, processor, device, dtype))
-            for path in image_files
-        ]
+        return _extract_paths(image_files)
 
-    result_df = pd.DataFrame(rows, columns=DETAIL_COLUMNS)
-    debug_print(
-        f"extract_zip_bytes finished: rows={len(result_df)} columns={list(result_df.columns)}"
-    )
-    log_variable("result_df", result_df.to_dict(orient="records"))
-    return result_df
+
+def extract_uploaded_files(uploaded_files) -> pd.DataFrame:
+    """Dipakai halaman Streamlit yang upload beberapa foto kwitansi
+    individual (bukan .zip), mis. pages_v2/06_Laporan_Keuangan_Kwitansi_
+    Premium.py - `uploaded_files` = list objek dari
+    st.file_uploader(accept_multiple_files=True) (masing-masing punya
+    .name/.getvalue()). Sama seperti extract_zip_bytes(): model di-load
+    sekali, kolom hasil identik (DETAIL_COLUMNS), kegagalan per-file masuk
+    kolom "catatan" bukan exception yang menghentikan batch.
+
+    Raises RuntimeError kalau model gagal dimuat, ValueError kalau
+    `uploaded_files` kosong.
+    """
+    if not uploaded_files:
+        raise ValueError("Tidak ada file kwitansi yang diupload.")
+
+    with tempfile.TemporaryDirectory(prefix="kwitansi_") as tmp_dir_str:
+        tmp_dir = Path(tmp_dir_str)
+        paths = []
+        for f in uploaded_files:
+            path = tmp_dir / f.name
+            path.write_bytes(f.getvalue())
+            paths.append(path)
+        return _extract_paths(paths)
 
 
 def build_raw_text_export(detail_df: pd.DataFrame) -> str:

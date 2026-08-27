@@ -1,38 +1,25 @@
-"""Generate Laporan Keuangan dari Kwitansi (VLM Extraction)
+"""Generate Laporan Keuangan dari Kwitansi (OCR lokal)
 
-Ekstraksi omset/profit otomatis dari foto kwitansi pembelian & penjualan.
-Model VLM (LightOnOCR-2-1B / dsb.) dijalankan TERPISAH di Colab (GPU),
-di-expose lewat ngrok jadi endpoint publik — halaman ini cuma manggil
-endpoint itu lewat HTTP, TIDAK load model apapun secara lokal. Ini
-penting karena app di-deploy ke Streamlit Community Cloud yang RAM/CPU-nya
-ga cukup buat inference VLM langsung.
+Ekstraksi omset/pembelian/profit otomatis dari foto kwitansi, pakai model
+OCR lokal LightOnOCR-2-1B lewat utils/kwitansi_extractor.py - modul yang
+sama dipakai fitur "Upload Kwitansi (ZIP)" di
+pages_v2/03_Pengajuan_Credit_Baru_Premium.py. Model di-load in-process
+(@st.cache_resource), BUKAN lewat endpoint remote/ngrok - diasumsikan app
+ini jalan di server/VM dgn GPU/RAM cukup, bukan Streamlit Community Cloud.
 
-Kontrak API (disepakati, implementasi endpoint dikerjakan terpisah):
-
-  POST {endpoint_url}/extract
-  Request: multipart/form-data, field "file" = gambar kwitansi (jpg/png)
-  Response (JSON):
-    {
-      "success": true,
-      "jenis": "penjualan" | "pembelian",
-      "tanggal": "2025-03-12",       # ISO YYYY-MM-DD
-      "nominal": 2400000,             # integer rupiah
-      "deskripsi": "...",             # ringkasan singkat, opsional
-      "confidence": 0.92,             # 0-1
-      "error": null                   # null kalau sukses
-    }
-
-  1 request = 1 gambar (bukan batch dalam satu request) — Streamlit yang
-  loop kalau user upload banyak file sekaligus.
+Beda dgn halaman 03 (upload 1 file .zip utk 1 nasabah yang SEDANG DIAJUKAN,
+auto-fill 2 field Profil Finansial di form pengajuan), halaman ini upload
+beberapa foto kwitansi individual (bukan zip) utk 1 nasabah yang SUDAH ADA
+di sistem, tujuannya generate laporan omset/pembelian/profit per tahun utk
+direview/didownload - bukan mengisi form pengajuan.
 """
 
-import requests
-import pandas as pd
 import streamlit as st
 
 from utils.data_loader import load_master_data
+from utils.kwitansi_extractor import build_raw_text_export, extract_uploaded_files
 from utils.ui_components import apply_logo
-from utils.ui_premium import inject_css, hero_banner, section_header, chart_title, kpi_card, rupiah_short
+from utils.ui_premium import inject_css, hero_banner, section_header, kpi_card, rupiah_short
 
 st.set_page_config(page_title="Generate Laporan Keuangan", page_icon="🧾", layout="wide")
 apply_logo()
@@ -40,52 +27,8 @@ inject_css()
 
 hero_banner(
     "Generate Laporan Keuangan",
-    "Ekstraksi omset & profit otomatis dari kwitansi menggunakan VLM."
+    "Ekstraksi omset & profit otomatis dari kwitansi menggunakan OCR lokal (LightOnOCR-2-1B)."
 )
-
-CONFIDENCE_THRESHOLD = 0.75  # di bawah ini, baris di-flag "perlu dicek manual"
-
-# ======================================================
-# KONFIGURASI ENDPOINT
-# ======================================================
-
-section_header("🔌", "Konfigurasi Endpoint")
-
-with st.container(border=True):
-    e1, e2, e3 = st.columns([3, 1, 1.2])
-
-    with e1:
-        endpoint_url = st.text_input(
-            "Ngrok URL (dari Colab)",
-            value=st.session_state.get("_vlm_endpoint", ""),
-            placeholder="https://xxxx.ngrok-free.app",
-        ).rstrip("/")
-        st.session_state["_vlm_endpoint"] = endpoint_url
-
-    with e2:
-        st.write("")
-        st.write("")
-        test_clicked = st.button("Test Koneksi", use_container_width=True)
-
-    with e3:
-        st.write("")
-        st.write("")
-        if test_clicked and endpoint_url:
-            try:
-                r = requests.get(f"{endpoint_url}/health", timeout=5)
-                if r.ok:
-                    st.session_state["_vlm_connected"] = True
-                    st.success("● Terhubung")
-                else:
-                    st.session_state["_vlm_connected"] = False
-                    st.error(f"● Gagal ({r.status_code})")
-            except Exception as e:
-                st.session_state["_vlm_connected"] = False
-                st.error(f"● {type(e).__name__}")
-        elif st.session_state.get("_vlm_connected"):
-            st.success("● Terhubung")
-        else:
-            st.warning("● Belum dites")
 
 # ======================================================
 # UPLOAD KWITANSI
@@ -118,73 +61,61 @@ with st.container(border=True):
 # ======================================================
 
 if run_extraction:
-    if not endpoint_url:
-        st.error("Isi Ngrok URL dulu di atas sebelum jalanin ekstraksi.")
-    else:
-        results = []
-        progress = st.progress(0.0, text="Memproses...")
-        for i, f in enumerate(uploaded_files):
-            try:
-                resp = requests.post(
-                    f"{endpoint_url}/extract",
-                    files={"file": (f.name, f.getvalue(), f.type)},
-                    timeout=60,
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                if not data.get("success"):
-                    raise ValueError(data.get("error") or "Ekstraksi gagal tanpa detail error.")
-                results.append({
-                    "file": f.name,
-                    "jenis": data.get("jenis", "-"),
-                    "tanggal": data.get("tanggal", "-"),
-                    "nominal": data.get("nominal", 0),
-                    "deskripsi": data.get("deskripsi", ""),
-                    "confidence": data.get("confidence", 0.0),
-                    "error": None,
-                })
-            except Exception as e:
-                results.append({
-                    "file": f.name, "jenis": "-", "tanggal": "-", "nominal": 0,
-                    "deskripsi": "", "confidence": 0.0, "error": str(e),
-                })
-            progress.progress((i + 1) / len(uploaded_files), text=f"Memproses {i + 1}/{len(uploaded_files)}...")
-        progress.empty()
-        st.session_state["_kwitansi_results"] = results
-        st.session_state["_kwitansi_nasabah"] = selected_nasabah
-        st.session_state["_kwitansi_tahun"] = tahun_laporan
+    with st.spinner(
+        "Menjalankan OCR lokal (LightOnOCR-2-1B) — pemuatan model pertama kali bisa "
+        "memakan waktu beberapa menit, proses berikutnya lebih cepat..."
+    ):
+        try:
+            extracted_df = extract_uploaded_files(uploaded_files)
+        except Exception as e:
+            st.session_state.pop("_kwitansi_extracted_df", None)
+            st.error(f"Gagal menjalankan ekstraksi: {type(e).__name__}: {e}")
+        else:
+            st.session_state["_kwitansi_extracted_df"] = extracted_df
+            st.session_state["_kwitansi_nasabah"] = selected_nasabah
+            st.session_state["_kwitansi_tahun"] = tahun_laporan
 
 # ======================================================
 # REVIEW & EDIT HASIL EKSTRAKSI
 # ======================================================
 
-if "_kwitansi_results" in st.session_state:
+if "_kwitansi_extracted_df" in st.session_state:
 
     section_header("🤖", "Review & Edit Hasil Ekstraksi")
 
-    results = st.session_state["_kwitansi_results"]
-    n_error = sum(1 for r in results if r["error"])
-    n_low_conf = sum(1 for r in results if not r["error"] and r["confidence"] < CONFIDENCE_THRESHOLD)
+    extracted_df = st.session_state["_kwitansi_extracted_df"]
+    n_gagal = int(extracted_df["total"].isna().sum())
+    if n_gagal:
+        st.warning(
+            f"⚠️ {n_gagal} dari {len(extracted_df)} kwitansi gagal terbaca lengkap (kolom "
+            "'Nominal' kosong) — koreksi manual di tabel di bawah, atau baris itu tidak "
+            "akan dihitung ke ringkasan."
+        )
 
-    if n_error:
-        st.error(f"{n_error} file gagal diekstrak — cek kolom Error di tabel, upload ulang kalau perlu.")
-    if n_low_conf:
-        st.warning(f"{n_low_conf} baris confidence-nya di bawah {CONFIDENCE_THRESHOLD:.0%} — cek & koreksi manual sebelum disimpan.")
+    st.download_button(
+        "⬇️ Download Teks OCR Mentah (.txt)",
+        data=build_raw_text_export(extracted_df),
+        file_name=f"raw_ocr_kwitansi_{st.session_state.get('_kwitansi_tahun', '')}.txt",
+        mime="text/plain",
+        help="Transkripsi OCR mentah per file, sebelum di-parse regex — dipakai untuk "
+             "cek/koreksi kalau ada field yang salah baca atau kosong.",
+    )
 
     with st.container(border=True):
-        edit_df = pd.DataFrame(results)
+        display_df = extracted_df.drop(columns=["raw_text"]).rename(columns={
+            "source_file": "File", "no_kwitansi": "No. Kwitansi", "jenis_kwitansi": "Jenis",
+            "tanggal": "Tanggal", "pihak_terkait": "Pihak Terkait", "nama_usaha": "Nama Usaha",
+            "nik_pemilik": "NIK Pemilik", "total": "Nominal", "catatan": "Catatan / Teks OCR",
+        })
         edited = st.data_editor(
-            edit_df.rename(columns={
-                "file": "File", "jenis": "Jenis", "tanggal": "Tanggal", "nominal": "Nominal",
-                "deskripsi": "Deskripsi", "confidence": "Confidence", "error": "Error",
-            }),
-            use_container_width=True, hide_index=True,
+            display_df,
+            use_container_width=True, hide_index=True, key="_kwitansi_editor_06",
+            disabled=["File", "Catatan / Teks OCR"],
             column_config={
-                "Jenis": st.column_config.SelectboxColumn(options=["penjualan", "pembelian", "-"]),
+                "Jenis": st.column_config.SelectboxColumn(options=["penjualan", "pembelian"]),
                 "Nominal": st.column_config.NumberColumn(min_value=0, step=1000),
-                "Confidence": st.column_config.ProgressColumn(min_value=0.0, max_value=1.0, format="%.0f%%"),
+                "Catatan / Teks OCR": st.column_config.TextColumn(width="large"),
             },
-            disabled=["File", "Confidence", "Error"],
         )
 
     # ======================================================
@@ -193,7 +124,7 @@ if "_kwitansi_results" in st.session_state:
 
     section_header("📌", "Ringkasan Laporan")
 
-    valid = edited[edited["Error"].isna()] if "Error" in edited.columns else edited
+    valid = edited[edited["Nominal"].notna()]
     total_penjualan = valid.loc[valid["Jenis"] == "penjualan", "Nominal"].sum()
     total_pembelian = valid.loc[valid["Jenis"] == "pembelian", "Nominal"].sum()
     estimasi_profit = total_penjualan - total_pembelian
