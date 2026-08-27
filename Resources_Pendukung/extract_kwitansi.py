@@ -1,5 +1,5 @@
 """
-extract_kwitansi_lightonocr.py
+extract_kwitansi.py
 Ekstraksi data kwitansi (pembelian & penjualan) dari foto (di dalam file .zip)
 menggunakan model VLM lokal LightOnOCR-2-1B (sama seperti di notebook contoh),
 lalu hitung Omset dan Profit per nasabah, per tahun.
@@ -8,7 +8,7 @@ Cara pakai (butuh GPU untuk kecepatan wajar, tapi bisa jalan di CPU juga):
     1. pip install -q git+https://github.com/huggingface/transformers pillow torch pandas
     2. Siapkan satu file .zip berisi foto kwitansi (.jpg/.png), boleh campur
        kwitansi dari beberapa nasabah/usaha sekaligus.
-    3. python extract_kwitansi_lightonocr.py --zip kwitansi.zip
+    3. python extract_kwitansi.py --zip kwitansi.zip
 
 Output:
     - hasil_kwitansi.csv          -> detail per kwitansi (untuk audit/debug)
