@@ -49,7 +49,6 @@ disuntikkan ke pipeline ML (lih. diskusi scope sebelum implementasi).
 from __future__ import annotations
 
 import argparse
-import logging
 import re
 import tempfile
 import zipfile
@@ -61,26 +60,19 @@ import streamlit as st
 MODEL_ID = "lightonai/LightOnOCR-2-1B"
 
 _LOG_PATH = Path(__file__).resolve().parents[1] / "log" / "log_kwitansi.txt"
-_LOGGER = logging.getLogger("kwitansi_extractor")
-_LOGGER.setLevel(logging.DEBUG)
-_LOGGER.propagate = False
-if not any(
-    isinstance(handler, logging.FileHandler)
-    and Path(handler.baseFilename).resolve() == _LOG_PATH.resolve()
-    for handler in _LOGGER.handlers
-):
-    _LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _file_handler = logging.FileHandler(_LOG_PATH, encoding="utf-8")
-    _file_handler.setLevel(logging.DEBUG)
-    _file_handler.setFormatter(
-        logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
-    )
-    _LOGGER.addHandler(_file_handler)
+
+
+def debug_print(message: str) -> None:
+    """Tampilkan pesan debugging dan simpan salinannya ke file log."""
+    print(message)
+    # _LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    # with _LOG_PATH.open("a", encoding="utf-8") as log_file:
+        # log_file.write(f"{message}\n")
 
 
 def log_variable(name: str, value) -> None:
-    """Tulis nama dan nilai variabel ke log kwitansi untuk debugging."""
-    _LOGGER.debug("variable %s = %r", name, value)
+    """Tampilkan nama dan nilai variabel untuk debugging."""
+    debug_print(f"variable {name} = {value!r}")
 
 # Prompt OCR generik - lihat docstring modul utk alasan kenapa BUKAN prompt
 # custom JSON schema (model ini mengabaikannya, gagal 100% di uji nyata).
@@ -103,7 +95,7 @@ def _load_model():
         MODEL_ID, torch_dtype=dtype
     ).to(device)
     processor = LightOnOcrProcessor.from_pretrained(MODEL_ID)
-    _LOGGER.info("OCR model loaded: model_id=%s device=%s dtype=%s", MODEL_ID, device, dtype)
+    debug_print(f"OCR model loaded: model_id={MODEL_ID} device={device} dtype={dtype}")
     return model, processor, device, dtype
 
 
@@ -115,7 +107,7 @@ def extract_one(image_path: Path, model, processor, device, dtype) -> dict:
     tetap dibawa di key "raw_text" utk audit/koreksi manual di preview."""
     from PIL import Image
 
-    _LOGGER.info("extract_one started: file=%s", image_path)
+    debug_print(f"extract_one started: file={image_path}")
     image = Image.open(image_path).convert("RGB")
     log_variable("image.size", image.size)
 
@@ -150,7 +142,7 @@ def extract_one(image_path: Path, model, processor, device, dtype) -> dict:
     parsed["source_file"] = image_path.name
     parsed["raw_text"] = raw_text
     log_variable("parsed_result", parsed)
-    _LOGGER.info("extract_one finished: file=%s", image_path.name)
+    debug_print(f"extract_one finished: file={image_path.name}")
     return parsed
 
 
@@ -248,7 +240,7 @@ def extract_zip_bytes(zip_bytes: bytes) -> pd.DataFrame:
     berisi foto sama sekali - caller diharapkan menampilkan pesan error dan
     TIDAK mengubah field form yang sudah ada (lihat docstring modul).
     """
-    _LOGGER.info("extract_zip_bytes started: zip_bytes=%d bytes", len(zip_bytes))
+    debug_print(f"extract_zip_bytes started: zip_bytes={len(zip_bytes)} bytes")
     try:
         model, processor, device, dtype = _load_model()
     except Exception as e:
@@ -278,7 +270,9 @@ def extract_zip_bytes(zip_bytes: bytes) -> pd.DataFrame:
         ]
 
     result_df = pd.DataFrame(rows, columns=DETAIL_COLUMNS)
-    _LOGGER.info("extract_zip_bytes finished: rows=%d columns=%s", len(result_df), list(result_df.columns))
+    debug_print(
+        f"extract_zip_bytes finished: rows={len(result_df)} columns={list(result_df.columns)}"
+    )
     log_variable("result_df", result_df.to_dict(orient="records"))
     return result_df
 
