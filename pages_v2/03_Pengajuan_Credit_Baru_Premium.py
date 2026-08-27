@@ -528,12 +528,13 @@ with tab_manual:
             preview_df = extracted_df.copy()
             preview_df.insert(0, "status", np.where(preview_df["total"].isna(), "⚠️ Perlu Dicek", "✅ OK"))
             edited_kwitansi = st.data_editor(
-                preview_df.drop(columns=["catatan"]),
+                preview_df,
                 use_container_width=True, hide_index=True, key="_kwitansi_editor",
-                disabled=["status", "source_file"],
+                disabled=["status", "source_file", "catatan"],
                 column_config={
                     "jenis_kwitansi": st.column_config.SelectboxColumn(options=["penjualan", "pembelian"]),
                     "total": st.column_config.NumberColumn(min_value=0, step=1000),
+                    "catatan": st.column_config.TextColumn("Catatan / Teks OCR Mentah", width="large"),
                 },
             )
 

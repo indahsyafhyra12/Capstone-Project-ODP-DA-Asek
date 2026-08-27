@@ -4,13 +4,35 @@
 section Profil Finansial.
 
 Dipindah dari Resources_Pendukung/extract_kwitansi.py (dulu script CLI
-mandiri) jadi modul reusable - EXTRACTION_PROMPT dan logika parsing JSON per
-kwitansi TIDAK diubah, cuma loading model dipisah jadi _load_model() (lazy
-import torch/transformers + @st.cache_resource, mengikuti pola
+mandiri), loading model dipisah jadi _load_model() (lazy import torch/
+transformers + @st.cache_resource, mengikuti pola
 utils/report_agent.py::_load_model()) supaya Streamlit tidak reload model
 ~2GB tiap interaksi, dan modul ini tetap bisa di-import di environment tanpa
 GPU/torch/transformers terpasang. CLI (`python -m utils.kwitansi_extractor
 --zip kwitansi.zip`) tetap tersedia dengan output yang sama seperti sebelumnya.
+
+Ekstraksi 2 tahap (BUKAN one-shot custom JSON seperti versi awal - diverifikasi
+gagal 100% di data uji nyata, lihat di bawah):
+  1. Model diberi prompt OCR generik "Extract all the text from this image." -
+     SATU-SATUNYA gaya prompt yang didemonstrasikan berhasil di
+     Resources_Pendukung/vlm-ocr-image.ipynb (notebook referensi resmi utk
+     model ini). LightOnOCR-2-1B adalah model OCR/transkripsi murni, BUKAN
+     VLM instruction-following - versi awal script ini memintanya keluarkan
+     JSON custom schema (translate label, format tanggal ISO, dst.), yang
+     ternyata diabaikan model itu: pada uji dgn 20 foto kwitansi asli, SEMUA
+     gagal (regex pencarian blok JSON tidak pernah ketemu di output karena
+     model cuma transkripsi teks polos, bukan JSON) - bukan gagal sebagian
+     yang wajar dari noise OCR, tapi gagal total yang menandakan prompt
+     salah total.
+  2. _parse_receipt_text() mem-parse teks transkripsi itu dgn regex sesuai
+     format kwitansi yang dipakai (lihat contoh kwitansi yg dishare user) -
+     "KWITANSI PENJUALAN/PEMBELIAN", "No. Kwitansi :", "Tanggal :",
+     "Kepada :"/"Dibeli dari :", "NIK Pemilik:", baris pertama = nama usaha,
+     "TOTAL ... Rp X" (word-boundary \bTOTAL\b supaya tidak ketarik ke baris
+     "Subtotal" per item). Field yang regex-nya tidak ketemu -> None (bukan
+     dikira-kira), teks transkripsi mentah selalu disimpan di kolom "catatan"
+     supaya user bisa cross-check/koreksi manual di preview kalau regexnya
+     meleset (mis. field custom yang tidak ada di 4 contoh kwitansi ini).
 
 Catatan skema (lihat utils/feature_builder.py::build_features_from_raw): 4
 field Profil Finansial di form hanya 2 yang murni raw ML feature yang
@@ -27,7 +49,6 @@ disuntikkan ke pipeline ML (lih. diskusi scope sebelum implementasi).
 from __future__ import annotations
 
 import argparse
-import json
 import re
 import tempfile
 import zipfile
@@ -38,25 +59,9 @@ import streamlit as st
 
 MODEL_ID = "lightonai/LightOnOCR-2-1B"
 
-EXTRACTION_PROMPT = """Baca kwitansi di gambar ini dan keluarkan HANYA JSON valid
-(tanpa teks lain, tanpa markdown code fence) dengan schema persis:
-
-{
-  "nama_usaha": string,
-  "nik_pemilik": string,
-  "jenis_kwitansi": "penjualan" | "pembelian",
-  "no_kwitansi": string,
-  "tanggal": "YYYY-MM-DD",
-  "pihak_terkait": string,
-  "total": number
-}
-
-Aturan:
-- Nilai "total" HARUS angka murni (integer), buang "Rp" dan pemisah ribuan.
-- jenis_kwitansi: "KWITANSI PENJUALAN" -> "penjualan", "KWITANSI PEMBELIAN" -> "pembelian".
-- Jika field tidak terbaca, isi null.
-- Output HARUS JSON valid, tanpa teks pembuka/penutup, tanpa ```.
-"""
+# Prompt OCR generik - lihat docstring modul utk alasan kenapa BUKAN prompt
+# custom JSON schema (model ini mengabaikannya, gagal 100% di uji nyata).
+EXTRACTION_PROMPT = "Extract all the text from this image."
 
 DETAIL_COLUMNS = [
     "source_file", "no_kwitansi", "jenis_kwitansi", "tanggal",
@@ -79,10 +84,11 @@ def _load_model():
 
 
 def extract_one(image_path: Path, model, processor, device, dtype) -> dict:
-    """Ekstrak 1 foto kwitansi jadi dict field mentah (schema EXTRACTION_PROMPT)
-    + "source_file". Kalau model gagal keluarkan JSON valid, dict berisi
-    "error"/"raw_output" alih-alih field kwitansi (bukan exception - dipakai
-    supaya kwitansi lain di zip yang sama tetap diproses)."""
+    """Ekstrak 1 foto kwitansi: jalankan OCR generik (EXTRACTION_PROMPT) lalu
+    strukturkan hasil transkripsinya jadi field kwitansi lewat
+    _parse_receipt_text(). Selalu berhasil return dict (tidak exception per
+    file) - field yang gagal di-regex jadi None, teks transkripsi mentah
+    tetap dibawa di key "raw_text" utk audit/koreksi manual di preview."""
     from PIL import Image
 
     image = Image.open(image_path).convert("RGB")
@@ -109,30 +115,77 @@ def extract_one(image_path: Path, model, processor, device, dtype) -> dict:
 
     output_ids = model.generate(**inputs, max_new_tokens=512)
     generated_ids = output_ids[0, inputs["input_ids"].shape[1]:]
-    output_text = processor.decode(generated_ids, skip_special_tokens=True).strip()
+    raw_text = processor.decode(generated_ids, skip_special_tokens=True).strip()
 
-    output_text = output_text.replace("```json", "").replace("```", "").strip()
-
-    match = re.search(r"\{.*\}", output_text, re.DOTALL)
-    json_str = match.group(0) if match else output_text
-
-    try:
-        parsed = json.loads(json_str)
-    except json.JSONDecodeError:
-        parsed = {"error": "gagal parse JSON", "raw_output": output_text}
-
+    parsed = _parse_receipt_text(raw_text)
     parsed["source_file"] = image_path.name
+    parsed["raw_text"] = raw_text
     return parsed
 
 
+_JENIS_RE = re.compile(r"\b(PENJUALAN|PEMBELIAN)\b", re.IGNORECASE)
+_NO_KWITANSI_RE = re.compile(r"No\.?\s*Kwitansi\s*[:=]?\s*([A-Za-z0-9\-/]+)", re.IGNORECASE)
+_TANGGAL_RE = re.compile(r"Tanggal\s*[:=]?\s*(\d{4}-\d{2}-\d{2})", re.IGNORECASE)
+_TANGGAL_FALLBACK_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
+_PIHAK_RE = re.compile(r"(?:Kepada|Dibeli\s*dari)\s*[:=]?\s*(.+)", re.IGNORECASE)
+_NIK_RE = re.compile(r"NIK\s*Pemilik\s*[:=]?\s*(\d+)", re.IGNORECASE)
+_TOTAL_RE = re.compile(r"\bTOTAL\b\s*[:=\-]?\s*Rp\.?\s*([\d.,]+)", re.IGNORECASE)
+_SIGNATURE_NAME_RE = re.compile(r"\(\s*([^)\n]+?)\s*\)\s*$")
+
+
+def _parse_receipt_text(raw_text: str) -> dict:
+    """Strukturkan hasil transkripsi OCR polos (EXTRACTION_PROMPT) jadi field
+    kwitansi, mengandalkan format kwitansi yang konsisten (lihat docstring
+    modul) - bukan LLM/model kedua, murni regex supaya deterministik & tidak
+    perlu model tambahan. Field yang tidak ketemu -> None."""
+    text = raw_text or ""
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+
+    jenis_match = _JENIS_RE.search(text)
+    jenis_kwitansi = jenis_match.group(1).lower() if jenis_match else None
+
+    tanggal_match = _TANGGAL_RE.search(text) or _TANGGAL_FALLBACK_RE.search(text)
+    tanggal = tanggal_match.group(1) if tanggal_match else None
+
+    pihak_match = _PIHAK_RE.search(text)
+    pihak_terkait = pihak_match.group(1).strip() if pihak_match else None
+
+    nik_match = _NIK_RE.search(text)
+    nik_pemilik = nik_match.group(1) if nik_match else None
+
+    no_kwitansi_match = _NO_KWITANSI_RE.search(text)
+    no_kwitansi = no_kwitansi_match.group(1) if no_kwitansi_match else None
+
+    total = None
+    total_match = _TOTAL_RE.search(text)
+    if total_match:
+        digits = re.sub(r"[^\d]", "", total_match.group(1))
+        if digits:
+            total = int(digits)
+
+    nama_usaha = lines[0] if lines else None
+    if nama_usaha and _JENIS_RE.search(nama_usaha):
+        # Baris pertama ternyata bukan nama usaha (mis. OCR lewatkan header) -
+        # coba ambil dari tanda tangan "( Nama Usaha )" di baris terakhir.
+        sig_match = _SIGNATURE_NAME_RE.search(lines[-1]) if lines else None
+        nama_usaha = sig_match.group(1) if sig_match else None
+
+    return {
+        "nama_usaha": nama_usaha, "nik_pemilik": nik_pemilik,
+        "jenis_kwitansi": jenis_kwitansi, "no_kwitansi": no_kwitansi,
+        "tanggal": tanggal, "pihak_terkait": pihak_terkait, "total": total,
+    }
+
+
 def _to_detail_row(result: dict) -> dict:
-    if "error" in result:
-        return {
-            "source_file": result.get("source_file"), "no_kwitansi": None,
-            "jenis_kwitansi": None, "tanggal": None, "pihak_terkait": None,
-            "nama_usaha": None, "nik_pemilik": None, "total": None,
-            "catatan": f"{result['error']}: {str(result.get('raw_output', ''))[:200]}",
-        }
+    raw_text = result.get("raw_text", "") or ""
+    missing = [
+        label for key, label in [
+            ("total", "total"), ("tanggal", "tanggal"), ("jenis_kwitansi", "jenis"),
+        ] if not result.get(key)
+    ]
+    catatan = f"Tidak terbaca: {', '.join(missing)}. " if missing else ""
+    catatan += f"Teks OCR: {raw_text[:200]}"
     return {
         "source_file": result.get("source_file"),
         "no_kwitansi": result.get("no_kwitansi"),
@@ -142,7 +195,7 @@ def _to_detail_row(result: dict) -> dict:
         "nama_usaha": result.get("nama_usaha"),
         "nik_pemilik": result.get("nik_pemilik"),
         "total": result.get("total"),
-        "catatan": "" if result.get("total") is not None else "Field tidak terbaca oleh OCR",
+        "catatan": catatan,
     }
 
 
@@ -314,9 +367,9 @@ def main():
             if col.startswith("omset_") or col.startswith("profit_"):
                 print(f"  {col:<12}: Rp {row[col]:,.0f}")
 
-    n_errors = int(df["catatan"].astype(bool).sum())
+    n_errors = int(df["total"].isna().sum())
     if n_errors:
-        print(f"\nPeringatan: {n_errors} kwitansi gagal di-parse, cek kolom 'catatan' di {args.output_csv}.")
+        print(f"\nPeringatan: {n_errors} kwitansi gagal di-parse (total tidak terbaca), cek kolom 'catatan' di {args.output_csv}.")
 
 
 if __name__ == "__main__":
