@@ -35,4 +35,4 @@ st.caption(f"Industri: {row['industry']} · {row['sub_industry']} — Badan usah
 st.divider()
 
 result = score_application(row)
-render_full_result(result)
+render_full_result(result, row)

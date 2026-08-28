@@ -54,6 +54,7 @@ from utils.agent_pipeline import (
     dhn_agent,
     collateral_agent,
     financial_agent,
+    recommend_credit_type,
 )
 
 MODEL_DIR = Path(__file__).parent.parent / "models"
@@ -86,7 +87,7 @@ def _num(value, default=0.0):
 # ---------------------------------------------------------------------------
 
 INTEREST_BY_ZONE = {"Hijau": 9.5, "Kuning": 12.0, "Merah": 15.0}
-TENOR_BY_LOAN = {"KMK": 12, "KI": 36, "KPR": 120, "KKB": 48, "KK": 24}
+TENOR_BY_LOAN = {"KMK": 12, "KI": 36, "KPR": 120, "KKB": 48, "KK": 24, "KUR": 36}
 STRONG, WEAK = 0.7, 0.5
 
 # agent_pipeline.py's cashflow_agent() is NOT calibrated for this dataset's
@@ -201,6 +202,8 @@ def _hard_reject_result(insight):
         "jenis_kredit_rekomendasi": "-", "nominal_disetujui": 0,
         "jangka_waktu_bulan": 0, "bunga_persen": None, "insight": insight,
         "insight_kategori": _kategori_insight(insight),
+        "jenis_kredit_sesuai": None, "dsr_pada_pengajuan": None,
+        "catatan_kesesuaian_kredit": None,
         "character_score": None, "character_notes": None,
         "financial_score": None, "financial_notes": None,
         "collateral_score": None, "collateral_notes": None,
@@ -267,6 +270,20 @@ def predict_credit_screening(row_raw_features: dict) -> dict:
     nominal, jenis = policy["nominal_disetujui"], policy["jenis_kredit_rekomendasi"]
     tenor, bunga = policy["jangka_waktu_bulan"], policy["bunga_persen"]
 
+    # Validasi jenis/tenor yang DIAJUKAN nasabah terhadap DSR (bukan ML
+    # feature - panggil fungsi yang sama dari agent_pipeline.py, jangan
+    # duplikat, supaya kedua sistem konsisten untuk bagian ini). Field
+    # "jenis_kredit_rekomendasi" di credit_type_check SENGAJA menimpa
+    # `jenis` dari policy di atas (tebakan naif dari nominal) - lihat
+    # docstring recommend_credit_type(); nominal/tenor/bunga TIDAK ikut
+    # diubah.
+    credit_type_check = recommend_credit_type(
+        row.get("loan_requested"), row.get("monthly_turnover_est"),
+        row.get("jenis_kredit_diajukan"), row.get("tenor_diajukan_bulan"),
+        row.get("slik_total_installment_other") or 0,
+    )
+    jenis = credit_type_check["jenis_kredit_rekomendasi"]
+
     # Sub-scores/notes purely for the insight narrative (NOT fed into the ML model)
     character = hard["credit_history"]
     financial = financial_agent(row.get("revenue_growth_pct"), row.get("profit_margin_2025"))
@@ -310,4 +327,7 @@ def predict_credit_screening(row_raw_features: dict) -> dict:
         "collateral_score": collateral["score"], "collateral_notes": "; ".join(collateral["notes"]),
         "cashflow_score": cashflow["score"], "cashflow_notes": cashflow["notes"],
         "shap_top_factors": top_factors,
+        "jenis_kredit_sesuai": credit_type_check["jenis_kredit_sesuai"],
+        "dsr_pada_pengajuan": credit_type_check["dsr_pada_pengajuan"],
+        "catatan_kesesuaian_kredit": credit_type_check["catatan_kesesuaian_kredit"],
     }

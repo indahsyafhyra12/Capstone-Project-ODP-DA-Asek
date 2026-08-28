@@ -2,6 +2,7 @@
 
 import streamlit as st
 
+from utils.agent_pipeline import recommend_credit_type
 from utils.data_loader import load_master_data
 from utils.ui_components import apply_logo
 from utils.ui_premium import (
@@ -175,6 +176,45 @@ f1.metric("Omzet Bulanan", rupiah_short(float(pick("monthly_turnover_est", defau
 growth = pick("revenue_growth_pct", default=None)
 f2.metric("Revenue Growth (YoY)", f"{float(growth):.1f}%" if isinstance(growth, (int, float)) else "-")
 f3.metric("Jumlah Karyawan", int(float(pick("employee_count", default=0))))
+
+# ==========================================================
+# KESESUAIAN JENIS KREDIT
+# ==========================================================
+# Bandingkan jenis kredit yang DIAJUKAN nasabah (jenis_kredit_diajukan/
+# tenor_diajukan_bulan, kolom master_scored.csv) terhadap kemampuan
+# bayarnya (DSR) - dihitung live di sini (fungsi murni, tidak butuh ML),
+# BUKAN dari kolom pre-computed karena field ini baru ada mulai
+# predict_credit_screening() versi terbaru, belum ikut di-generate ulang
+# ke master_scored.csv. Tidak ditampilkan sama sekali kalau nasabah tidak
+# mengisi jenis/tenor pengajuan (jenis_kredit_sesuai == None).
+
+credit_type_check = recommend_credit_type(
+    loan, float(pick("monthly_turnover_est", default=0)) or 1,
+    pick("jenis_kredit_diajukan", default=None), pick("tenor_diajukan_bulan", default=None),
+)
+
+if credit_type_check["jenis_kredit_sesuai"] is not None:
+    section_header("📑", "Kesesuaian Jenis Kredit")
+
+    sesuai = credit_type_check["jenis_kredit_sesuai"]
+    sesuai_color = ZONE_COLORS["layak"] if sesuai else ZONE_COLORS["layak_bersyarat"]
+    dsr = credit_type_check["dsr_pada_pengajuan"]
+
+    with st.container(border=True):
+        q1, q2, q3, q4 = st.columns(4)
+        q1.metric("Jenis Diajukan", pick("jenis_kredit_diajukan", default="-"))
+        tenor_diajukan = pick("tenor_diajukan_bulan", default=None)
+        q2.metric("Tenor Diajukan", f"{tenor_diajukan} bulan" if tenor_diajukan else "-")
+        q3.metric("Jenis Direkomendasikan", credit_type_check["jenis_kredit_rekomendasi"])
+        q4.metric("DSR Pengajuan", f"{dsr*100:.0f}%" if dsr is not None else "-")
+
+        st.markdown(
+            f'<span style="background:{sesuai_color}22;color:{sesuai_color};border:1px solid {sesuai_color};'
+            f'padding:3px 10px;border-radius:99px;font-size:12px;font-weight:600;">'
+            f'{"Sesuai" if sesuai else "Perlu Penyesuaian"}</span>',
+            unsafe_allow_html=True,
+        )
+        st.caption(credit_type_check["catatan_kesesuaian_kredit"])
 
 # ==========================================================
 # SUPPORTING INFORMATION

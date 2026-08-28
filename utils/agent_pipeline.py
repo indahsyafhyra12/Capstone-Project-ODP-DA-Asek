@@ -301,10 +301,11 @@ DECISION_TIERS = [
     (0.00, "Tidak Layak", "Merah"),
 ]
 
-INTEREST_RATE_PA = {"Hijau": 10.0, "Kuning": 13.0, "Merah": None}
+INTEREST_RATE_PA = {"Hijau": 10.0, "Kuning": 13.0, "Merah": None, "KUR": 6.0}
 TENOR_MONTHS = {
     "KMK": {"Hijau": 36, "Kuning": 24},
     "KI": {"Hijau": 60, "Kuning": 48},
+    "KUR": {"Hijau": 36, "Kuning": 24},
 }
 APPROVAL_RATIO = {"Layak": 1.0, "Layak Bersyarat": 0.80, "Perlu Review Ulang": 0.50, "Tidak Layak": 0.0}
 
@@ -392,6 +393,104 @@ def risk_agent(identity, credit_history, dhn, collateral, financial, cashflow,
 
 
 # ---------------------------------------------------------------------------
+# 8. Credit Type Recommendation (memvalidasi jenis/tenor yang DIAJUKAN
+# nasabah terhadap kemampuan bayarnya, bukan cuma menebak dari nominal
+# seperti _recommend_loan_type() di atas)
+# ---------------------------------------------------------------------------
+
+KUR_KECIL_MAX = 500_000_000
+TENOR_RANGE_DIAJUKAN = {"KUR": (12, 36), "KMK": (12, 24), "KI": (36, 60)}
+INTEREST_RATE_DIAJUKAN = {"KUR": 0.06, "KMK": 0.11, "KI": 0.10}
+DSR_AMAN = 0.40
+
+
+def _hitung_dsr_pengajuan(loan_requested, jenis, tenor, slik_installment_lain, turnover):
+    rate = INTEREST_RATE_DIAJUKAN[jenis]
+    cicilan = loan_requested / tenor * (1 + rate * tenor / 12)
+    dsr = (slik_installment_lain + cicilan) / max(turnover, 1)
+    return dsr, cicilan
+
+
+def recommend_credit_type(loan_requested, monthly_turnover_est, jenis_kredit_diajukan,
+                            tenor_diajukan_bulan, slik_total_installment_other=0):
+    """Bandingkan jenis kredit & tenor yang DIAJUKAN nasabah terhadap
+    kemampuan bayarnya (DSR), bukan cuma menebak dari nominal seperti
+    _recommend_loan_type() lama. Dipanggil terpisah dari risk_agent()
+    supaya bisa dites/dipakai ulang independen.
+
+    `jenis_kredit_rekomendasi` di hasil ini SENGAJA menggantikan field
+    dengan nama sama dari risk_agent() (lihat pemanggilan di
+    score_application()) - itu tebakan naif dari nominal pinjaman saja,
+    ini rekomendasi yang sudah divalidasi terhadap DSR. Field
+    nominal_disetujui/jangka_waktu_bulan/bunga_persen risk_agent() TIDAK
+    ikut diubah di sini (lihat Resources_Pendukung/penyesuaian_data_terbaru.md)."""
+    ratio = loan_requested / max(monthly_turnover_est, 1)
+    default_jenis = _recommend_loan_type(loan_requested, monthly_turnover_est)
+    if loan_requested <= KUR_KECIL_MAX and ratio <= 6:
+        default_jenis = "KUR"
+
+    if not jenis_kredit_diajukan or not tenor_diajukan_bulan:
+        # data pengajuan gak ada (mis. simulasi manual tanpa isi field ini)
+        return {"jenis_kredit_rekomendasi": default_jenis, "jenis_kredit_sesuai": None,
+                "dsr_pada_pengajuan": None, "catatan_kesesuaian_kredit": None}
+
+    if jenis_kredit_diajukan == "KUR" and loan_requested > KUR_KECIL_MAX:
+        return {
+            "jenis_kredit_rekomendasi": default_jenis, "jenis_kredit_sesuai": False,
+            "dsr_pada_pengajuan": None,
+            "catatan_kesesuaian_kredit": (
+                f"KUR tidak dapat diberikan untuk plafon di atas Rp500 juta sesuai "
+                f"ketentuan pemerintah. Direkomendasikan {default_jenis}."),
+        }
+
+    dsr, _ = _hitung_dsr_pengajuan(loan_requested, jenis_kredit_diajukan, tenor_diajukan_bulan,
+                                     slik_total_installment_other, monthly_turnover_est)
+    if dsr <= DSR_AMAN:
+        return {
+            "jenis_kredit_rekomendasi": jenis_kredit_diajukan, "jenis_kredit_sesuai": True,
+            "dsr_pada_pengajuan": round(dsr, 3),
+            "catatan_kesesuaian_kredit": (
+                f"Pengajuan {jenis_kredit_diajukan} tenor {tenor_diajukan_bulan} bulan sesuai, "
+                f"DSR {dsr*100:.0f}%."),
+        }
+
+    tmin, tmax = TENOR_RANGE_DIAJUKAN[jenis_kredit_diajukan]
+    for t in range(tenor_diajukan_bulan + 6, tmax + 1, 6):
+        dsr2, _ = _hitung_dsr_pengajuan(loan_requested, jenis_kredit_diajukan, t,
+                                          slik_total_installment_other, monthly_turnover_est)
+        if dsr2 <= DSR_AMAN:
+            return {
+                "jenis_kredit_rekomendasi": jenis_kredit_diajukan, "jenis_kredit_sesuai": False,
+                "dsr_pada_pengajuan": round(dsr, 3),
+                "catatan_kesesuaian_kredit": (
+                    f"Tenor {tenor_diajukan_bulan} bulan terlalu berat (DSR {dsr*100:.0f}%). "
+                    f"Disarankan perpanjang tenor jadi {t} bulan (DSR turun ke {dsr2*100:.0f}%)."),
+            }
+
+    if jenis_kredit_diajukan != "KI":
+        tmin_ki, tmax_ki = TENOR_RANGE_DIAJUKAN["KI"]
+        for t in range(tmin_ki, tmax_ki + 1, 6):
+            dsr3, _ = _hitung_dsr_pengajuan(loan_requested, "KI", t,
+                                              slik_total_installment_other, monthly_turnover_est)
+            if dsr3 <= DSR_AMAN:
+                return {
+                    "jenis_kredit_rekomendasi": "KI", "jenis_kredit_sesuai": False,
+                    "dsr_pada_pengajuan": round(dsr, 3),
+                    "catatan_kesesuaian_kredit": (
+                        f"DSR pada {jenis_kredit_diajukan} terlalu tinggi ({dsr*100:.0f}%). "
+                        f"Disarankan alih ke KI tenor {t} bulan (DSR turun ke {dsr3*100:.0f}%)."),
+                }
+
+    return {
+        "jenis_kredit_rekomendasi": jenis_kredit_diajukan, "jenis_kredit_sesuai": False,
+        "dsr_pada_pengajuan": round(dsr, 3),
+        "catatan_kesesuaian_kredit": (
+            f"DSR tetap tinggi ({dsr*100:.0f}%) meski tenor maksimal — "
+            f"disarankan review manual/tambahan agunan/penjamin."),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Entry points
 # ---------------------------------------------------------------------------
 
@@ -419,6 +518,13 @@ def score_application(data) -> dict:
         monthly_turnover_est=get("monthly_turnover_est") or 1,
         collateral_liquidation_value=get("collateral_liquidation_value"),
     )
+    credit_type_check = recommend_credit_type(
+        loan_requested=get("loan_requested") or 0,
+        monthly_turnover_est=get("monthly_turnover_est") or 1,
+        jenis_kredit_diajukan=get("jenis_kredit_diajukan"),
+        tenor_diajukan_bulan=get("tenor_diajukan_bulan"),
+        slik_total_installment_other=get("slik_total_installment_other") or 0,
+    )
 
     return {
         "identity": identity,
@@ -428,6 +534,7 @@ def score_application(data) -> dict:
         "financial": financial,
         "cashflow": cashflow,
         "risk": risk,
+        "credit_type_check": credit_type_check,
     }
 
 
@@ -450,6 +557,11 @@ def _flatten(result: dict) -> dict:
         "bunga_persen": risk["bunga_persen"],
         "insight": risk["insight"],
     })
+    # credit_type_check["jenis_kredit_rekomendasi"] SENGAJA menimpa nilai dari
+    # risk di atas (tebakan naif dari nominal) - lihat docstring
+    # recommend_credit_type(). jenis_kredit_sesuai/dsr_pada_pengajuan/
+    # catatan_kesesuaian_kredit adalah field baru.
+    flat.update(result["credit_type_check"])
     return flat
 
 

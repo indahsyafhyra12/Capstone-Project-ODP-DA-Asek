@@ -66,7 +66,11 @@ YA_TIDAK_OPTIONS = ["Ya", "Tidak"]
 # model dan mau menyesuaikan sendiri sebelum hasil dianggap final.
 DECISION_OPTIONS = ["Layak", "Layak Bersyarat", "Perlu Review Ulang", "Tidak Layak"]
 ZONE_OPTIONS = ["Hijau", "Kuning", "Merah"]
-JENIS_KREDIT_OPTIONS = ["KMK", "KI", "KPR", "KKB", "KK", "-"]
+JENIS_KREDIT_OPTIONS = ["KMK", "KI", "KUR", "KPR", "KKB", "KK", "-"]
+# Jenis yang bisa dipilih nasabah SAAT MENGAJUKAN (beda dari JENIS_KREDIT_OPTIONS
+# di atas, yang juga menampung hasil rekomendasi/override) - dibatasi ke 3 jenis
+# yang divalidasi recommend_credit_type() (utils/agent_pipeline.py).
+JENIS_KREDIT_DIAJUKAN_OPTIONS = ["KMK", "KI", "KUR"]
 MANUAL_EDIT_FIELDS = [
     "Decision (Eligibility Recommendation)", "Risk Score / Eligibility Score", "Zone",
     "Jenis Kredit", "Nominal Disetujui", "Jangka Waktu (bulan)", "Bunga (% p.a.)",
@@ -89,12 +93,14 @@ OPTIONAL_CSV_DEFAULTS = {
     "province": "", "city": "", "district": "", "sub_industry": None,
     "collateral_location": "", "collateral_province": "", "collateral_city": "",
     "collateral_size_m2": 0.0, "rm_id": None,
+    "jenis_kredit_diajukan": None, "tenor_diajukan_bulan": 0, "tujuan_penggunaan_kredit": "",
 }
 FORM_FIELDS_ORDER = [
     "NIK", "owner_name", "owner_age", "owner_gender", "owner_marital_status", "owner_education",
     "company_name", "legal_entity", "industry", "sub_industry", "business_age_year", "employee_count",
     "branch_name", "province", "city", "district", "region",
     "monthly_turnover_est", "transaction_frequency_monthly", "loan_requested", "estimated_dsr",
+    "jenis_kredit_diajukan", "tenor_diajukan_bulan", "tujuan_penggunaan_kredit",
     "collateral_type", "certificate_type", "collateral_market_value", "collateral_liquidation_value",
     "collateral_size_m2", "ownership_match", "collateral_location", "collateral_province", "collateral_city",
 ]
@@ -132,6 +138,8 @@ def _build_csv_template() -> bytes:
         "collateral_province": "Jawa Barat", "collateral_city": "Depok", "collateral_size_m2": 100.0,
         "collateral_market_value": 500_000_000, "collateral_liquidation_value": 400_000_000,
         "certificate_type": "SHM", "ownership_match": "Ya", "estimated_dsr": 1.0,
+        "jenis_kredit_diajukan": "KMK", "tenor_diajukan_bulan": 24,
+        "tujuan_penggunaan_kredit": "Tambahan modal kerja operasional usaha",
     }
     cols = REQUIRED_CSV_COLUMNS + [c for c in OPTIONAL_CSV_DEFAULTS if c != "rm_id"]
     cols = list(dict.fromkeys(cols))  # dedupe, keep order
@@ -194,6 +202,11 @@ def run_ml_screening(user_fields: dict, application_id: str) -> dict:
         "_manual_override": False,
         "_loan_requested": loan_requested,
         "_collateral_market_value": collateral_market_value,
+        "_jenis_kredit_diajukan": user_fields.get("jenis_kredit_diajukan"),
+        "_tenor_diajukan_bulan": user_fields.get("tenor_diajukan_bulan"),
+        "_jenis_kredit_sesuai": result["jenis_kredit_sesuai"],
+        "_dsr_pada_pengajuan": result["dsr_pada_pengajuan"],
+        "_catatan_kesesuaian_kredit": result["catatan_kesesuaian_kredit"],
     }
 
 
@@ -493,6 +506,23 @@ with tab_manual:
         estimated_dsr = st.number_input("Estimasi DSR (Debt Service Ratio)", min_value=0.0, max_value=3.0, value=float(sv("estimated_dsr", 1.0)), step=0.1,
                                          help="Dibatasi maks 3.0 (dsr_capped) sesuai skema data training.")
 
+        jd1, jd2 = st.columns(2)
+        with jd1:
+            jenis_kredit_diajukan = st.selectbox(
+                "Jenis Kredit Diajukan", JENIS_KREDIT_DIAJUKAN_OPTIONS,
+                index=sb_index(JENIS_KREDIT_DIAJUKAN_OPTIONS, "jenis_kredit_diajukan", JENIS_KREDIT_DIAJUKAN_OPTIONS[0]),
+                help="Dipakai untuk validasi kesesuaian jenis & tenor terhadap kemampuan bayar (DSR).",
+            )
+        with jd2:
+            tenor_diajukan_bulan = st.number_input(
+                "Tenor Diajukan (bulan)", min_value=1, max_value=120,
+                value=int(sv("tenor_diajukan_bulan", 24) or 24), step=6,
+            )
+        tujuan_penggunaan_kredit = st.text_area(
+            "Tujuan Penggunaan Kredit", value=sv("tujuan_penggunaan_kredit", ""),
+            placeholder="Contoh: Tambahan modal kerja operasional usaha", height=80,
+        )
+
         st.subheader("Agunan")
         c13, c14, c15 = st.columns(3)
         with c13:
@@ -537,6 +567,8 @@ with tab_manual:
             "province": province, "city": city, "district": district, "region": region,
             "monthly_turnover_est": monthly_turnover_est, "transaction_frequency_monthly": transaction_frequency_monthly,
             "loan_requested": loan_requested, "estimated_dsr": estimated_dsr,
+            "jenis_kredit_diajukan": jenis_kredit_diajukan, "tenor_diajukan_bulan": tenor_diajukan_bulan,
+            "tujuan_penggunaan_kredit": tujuan_penggunaan_kredit,
             "collateral_type": collateral_type, "certificate_type": certificate_type,
             "collateral_market_value": collateral_market_value, "collateral_liquidation_value": collateral_liquidation_value,
             "collateral_size_m2": collateral_size_m2, "ownership_match": ownership_match,
@@ -625,6 +657,22 @@ with tab_manual:
                     for k in ("_edit_decision", "_edit_zone", "_edit_risk_score", "_edit_jenis", "_edit_nominal", "_edit_tenor", "_edit_bunga"):
                         st.session_state.pop(k, None)
                     st.rerun()
+
+        if result_row.get("_jenis_kredit_sesuai") is not None:
+            st.subheader("Kesesuaian Jenis Kredit")
+            with st.container(border=True):
+                q1, q2, q3, q4 = st.columns(4)
+                q1.metric("Jenis Diajukan", result_row.get("_jenis_kredit_diajukan") or "-")
+                tenor_d = result_row.get("_tenor_diajukan_bulan")
+                q2.metric("Tenor Diajukan", f"{tenor_d} bulan" if tenor_d else "-")
+                q3.metric("Jenis Direkomendasikan", result_row["Jenis Kredit"])
+                dsr = result_row.get("_dsr_pada_pengajuan")
+                q4.metric("DSR Pengajuan", f"{dsr*100:.0f}%" if dsr is not None else "-")
+                if result_row["_jenis_kredit_sesuai"]:
+                    st.success("Sesuai")
+                else:
+                    st.warning("Perlu Penyesuaian")
+                st.caption(result_row.get("_catatan_kesesuaian_kredit") or "")
 
         with st.expander("Insight teknis dari model (rule-based, tersedia instan)"):
             st.write(result_row["_insight"])

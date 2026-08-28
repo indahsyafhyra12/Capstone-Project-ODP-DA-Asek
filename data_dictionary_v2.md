@@ -182,6 +182,9 @@ Tabel pengajuan kredit utama. **Primary Key:** `application_id` |
 | monthly_turnover_est | int (IDR) | Estimasi omset bulanan | 2.672.137 |
 | transaction_frequency_monthly | int | Frekuensi transaksi/bulan | 66 |
 | loan_requested | int (IDR) | Nominal pinjaman diajukan | 300.000.000 |
+| jenis_kredit_diajukan ⭐ | string | **[Dipakai mulai versi ini]** KMK/KI/KUR yang diajukan nasabah — divalidasi terhadap DSR lewat `recommend_credit_type()` (`utils/agent_pipeline.py`) | KI |
+| tenor_diajukan_bulan ⭐ | int | **[Dipakai mulai versi ini]** Tenor yang diajukan nasabah (bulan) — input `recommend_credit_type()` | 54 |
+| tujuan_penggunaan_kredit ⭐ | string | **[Dipakai mulai versi ini]** Tujuan penggunaan kredit, tampilan teks saja — bukan fitur ML/rule | Pembelian mesin produksi tambahan usaha |
 | collateral_type | string | Jenis agunan | Rumah |
 | collateral_location/province/city | string | Lokasi agunan | Poris Plawad, Tangerang / Banten / Tangerang |
 | collateral_size_m2 | float | Total luas agunan (m²) | 423.4 |
@@ -233,7 +236,7 @@ keputusan akhir.
 | risk_score | float (0–1) | Skor gabungan dari Risk Agent (makin ke 1 makin layak) | 0.825 |
 | **decision** | string | **Layak / Layak Bersyarat / Perlu Review Ulang / Tidak Layak** | Layak |
 | **zone** | string | Hijau / Kuning / Merah (turunan dari decision) | Hijau |
-| jenis_kredit_rekomendasi | string | KMK / KI (berdasar skala pinjaman) | KI |
+| jenis_kredit_rekomendasi ⭐ | string | KMK / KI / KUR — divalidasi terhadap `jenis_kredit_diajukan` & DSR lewat `recommend_credit_type()` kalau data pengajuan tersedia, fallback ke tebakan dari skala pinjaman kalau tidak | KI |
 | nominal_disetujui | int (IDR) | min(loan_requested, 70% nilai agunan) | 300.000.000 |
 | jangka_waktu_bulan | int | Tenor rekomendasi | 36 |
 | bunga_persen | float | Bunga berdasar zone (9.5/12.0/15.0) | 9.5 |
@@ -257,6 +260,36 @@ salah satu dari 7 agent.
 
 ---
 
+### 11. Field Kesesuaian Jenis Kredit ⭐ (dihitung live, TIDAK tersimpan di `master_scored.csv`)
+
+`recommend_credit_type()` (`utils/agent_pipeline.py`) memvalidasi
+`jenis_kredit_diajukan`/`tenor_diajukan_bulan` terhadap kemampuan bayar
+(DSR) nasabah. Dipanggil dari `score_application()`
+(`utils/agent_pipeline.py`, dipakai `pages/2_Detail_Nasabah.py`) dan
+`predict_credit_screening()` (`utils/risk_ml_pipeline.py`, dipakai halaman
+Pengajuan Credit Baru) — **bukan kolom pre-computed** seperti tabel 9-10 di
+atas, jadi tidak ikut ter-generate ulang ke `master_scored.csv` sampai file
+itu diregenerasi ulang lewat notebook.
+
+| Field | Tipe | Definisi | Contoh |
+|---|---|---|---|
+| jenis_kredit_sesuai | bool / None | `True` kalau pengajuan sesuai DSR (≤40%) apa adanya, `False` kalau perlu penyesuaian tenor/jenis, `None` kalau data pengajuan tidak diisi | False |
+| dsr_pada_pengajuan | float / None | DSR dihitung dari nominal & tenor yang DIAJUKAN (beda dari `estimated_dsr` yang manual) | 0.65 |
+| catatan_kesesuaian_kredit | string / None | Narasi penjelasan (mis. saran perpanjang tenor, alih jenis ke KI, atau plafon KUR terlampaui) | "Tenor 12 bulan terlalu berat (DSR 62%). Disarankan perpanjang tenor jadi 24 bulan (DSR turun ke 34%)." |
+
+> ⚠️ **Catatan validasi:** DSR dihitung dari `cicilan_bulanan_pengajuan`
+> (atau turunannya) dibagi `monthly_turnover_est` — pada distribusi
+> `master_dataset.csv` yang ada saat ini, rasio itu median-nya ~12x
+> (jauh di atas ambang `DSR_AMAN = 0.40`), sehingga mayoritas baris keluar
+> `jenis_kredit_sesuai = False`. Ini konsisten dengan `estimated_dsr` yang
+> juga mayoritas mepet ke cap 3.0 di kolom yang sama — bukan bug di
+> `recommend_credit_type()`, tapi sinyal bahwa `DSR_AMAN` mungkin perlu
+> dikalibrasi ulang ke skala dataset ini kalau field ini mau dipakai
+> sebagai sinyal yang lebih seimbang (lih. kalibrasi serupa yang sudah
+> dilakukan utk Cashflow Agent di atas).
+
+---
+
 ## Ringkasan Perubahan dari Versi Sebelumnya
 
 | Perubahan | Detail |
@@ -265,4 +298,5 @@ salah satu dari 7 agent.
 | Kolom baru | `current_balance` di `bank_account`; `rm_id` di `retail_customer_profile` |
 | Kalibrasi ulang | Cashflow Agent — skala saldo generator berubah (multiplier 40–100x, dulu 2–6x), rumus skor dinormalisasi pakai persentil ke-90 data historis |
 | Narasi insight | Lengkap 6 kategori (dulu 4 dari 6) |
+| Kesesuaian Jenis Kredit | `jenis_kredit_diajukan`/`tenor_diajukan_bulan`/`tujuan_penggunaan_kredit` (sudah ada di data, sebelumnya tidak dipakai) mulai divalidasi terhadap DSR lewat `recommend_credit_type()` — lihat tabel 11 |
 | Kolom leakage/sensitif/operasional yang harus dihindari sbg fitur model | `eligibility_score`, `label` (leakage) · `owner_gender`, `owner_marital_status` (sensitif/fair-lending) · `rm_id`, `rm_name`, `rm_branch_name`, `level`, dll (operasional/governance) |

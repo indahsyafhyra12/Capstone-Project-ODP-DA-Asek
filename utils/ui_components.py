@@ -92,11 +92,42 @@ def render_risk_card(risk: dict):
         st.info(risk["insight"])
 
 
-def render_full_result(result: dict):
-    """Render the 6 agent cards (3x2 grid) + the big risk card, given the
-    dict returned by agent_pipeline.score_application()."""
+def render_credit_type_card(credit_type_check: dict, jenis_kredit_diajukan=None, tenor_diajukan_bulan=None):
+    """Kartu "Kesesuaian Jenis Kredit" - bandingkan jenis kredit yang DIAJUKAN
+    nasabah terhadap rekomendasi yang sudah divalidasi lewat DSR (lihat
+    agent_pipeline.recommend_credit_type()). Tidak ditampilkan sama sekali
+    kalau data pengajuan (jenis/tenor) tidak ada (mis. Simulasi manual tanpa
+    isi field ini) - jenis_kredit_sesuai bernilai None di kasus itu."""
+    if credit_type_check.get("jenis_kredit_sesuai") is None:
+        return
+
+    sesuai = credit_type_check["jenis_kredit_sesuai"]
+    color = "#16a34a" if sesuai else "#d97706"
+    with st.container(border=True):
+        st.markdown("**📑 Kesesuaian Jenis Kredit**")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Jenis Diajukan", jenis_kredit_diajukan or "-")
+        c2.metric("Tenor Diajukan", f"{tenor_diajukan_bulan} bulan" if tenor_diajukan_bulan else "-")
+        c3.metric("Jenis Direkomendasikan", credit_type_check.get("jenis_kredit_rekomendasi") or "-")
+
+        dsr = credit_type_check.get("dsr_pada_pengajuan")
+        st.markdown(
+            badge_html("Sesuai" if sesuai else "Perlu Penyesuaian", color)
+            + (f" &nbsp; DSR pada pengajuan: **{dsr*100:.0f}%**" if dsr is not None else ""),
+            unsafe_allow_html=True,
+        )
+        st.caption(credit_type_check.get("catatan_kesesuaian_kredit") or "")
+
+
+def render_full_result(result: dict, row=None):
+    """Render the 6 agent cards (3x2 grid) + the big risk card + kartu
+    Kesesuaian Jenis Kredit, given the dict returned by
+    agent_pipeline.score_application(). `row` (opsional) dipakai untuk
+    menampilkan jenis/tenor yang DIAJUKAN nasabah apa adanya di kartu
+    Kesesuaian Jenis Kredit - kalau tidak diisi, kartu itu tetap muncul tapi
+    tanpa kolom "Jenis/Tenor Diajukan"."""
     render_risk_card(result["risk"])
-    
+
     keys = ["identity", "credit_history", "dhn", "collateral", "financial", "cashflow"]
     row1 = st.columns(3)
     for col, key in zip(row1, keys[:3]):
@@ -107,3 +138,8 @@ def render_full_result(result: dict):
         with col:
             render_agent_card(key, result[key])
     st.write("")
+
+    if "credit_type_check" in result:
+        jenis_diajukan = row.get("jenis_kredit_diajukan") if row is not None else None
+        tenor_diajukan = row.get("tenor_diajukan_bulan") if row is not None else None
+        render_credit_type_card(result["credit_type_check"], jenis_diajukan, tenor_diajukan)
