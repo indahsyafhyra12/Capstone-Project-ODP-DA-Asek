@@ -407,7 +407,7 @@ def hero_banner(title, subtitle):
         '<div class="hero-banner-circle"></div>'
         '<div class="hero-banner-left">'
         '<div class="hero-banner-icon">'
-        f'<img src="{LOGO_DATA_URI}" style="width:100px;object-fit:contain;">'
+        f'<img src="{LOGO_DATA_URI}" style="width:105px;object-fit:contain;">'
         '</div>'
         f'<div><div class="hero-banner-title">{title}</div>'
         f'<div class="hero-banner-subtitle">{subtitle}</div></div>'
