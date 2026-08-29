@@ -68,7 +68,7 @@ pg = st.navigation([
 
     st.Page(
         "pages_v2/05_RM_Performance_Premium.py",
-        title="RM Performance",
+        title="RM Monitoring",
         icon="🏆"
     ),
 

@@ -1,23 +1,23 @@
-"""Premium RM Performance V1"""
+"""Premium RM Monitoring V1"""
 
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-from utils.data_loader import load_master_data
+from utils.data_loader import load_master_data, load_rm_network
 from utils.ui_components import apply_logo
 from utils.ui_premium import (
     inject_css, hero_banner, section_header, chart_title, kpi_card, rupiah_short,
-    WONDR_COLORS, ZONE_COLORS
+    WONDR_COLORS, ZONE_COLORS, WONDR_CATEGORICAL
 )
 
-st.set_page_config(page_title="RM Performance", page_icon="🏆", layout="wide")
+st.set_page_config(page_title="RM Monitoring", page_icon="🏆", layout="wide")
 apply_logo()
 inject_css()
 
 hero_banner(
-    "RM Performance",
+    "RM Monitoring",
     "Ringkasan performa Relationship Banking Officer."
 )
 
@@ -101,6 +101,138 @@ styled = leaderboard_display.style.format({"Approval Rate": "{:.1%}"}).backgroun
 
 with st.container(border=True):
     st.dataframe(styled, use_container_width=True, hide_index=True, height=420)
+
+# ======================================================
+# RM NETWORK — GRAPH ANALYTICS (segment overlap & concentration risk)
+# hasil notebooks/graph_analytics_rm_network.ipynb, diekspor ke
+# data/processed/rm_network_nodes.csv & rm_network_edges.csv
+# ======================================================
+
+section_header("🕸️", "RM Network — Overlap Portofolio Antar RM")
+
+net_nodes, net_edges = load_rm_network()
+
+net_nodes_f = net_nodes.copy()
+if f_region != "Semua":
+    net_nodes_f = net_nodes_f[net_nodes_f.region == f_region]
+if f_branch != "Semua":
+    net_nodes_f = net_nodes_f[net_nodes_f.branch_name == f_branch]
+if f_level != "Semua":
+    net_nodes_f = net_nodes_f[net_nodes_f.level == f_level]
+
+active_ids = set(net_nodes_f["rm_id"])
+net_edges_f = net_edges[
+    net_edges.rm_id_a.isin(active_ids) & net_edges.rm_id_b.isin(active_ids)
+].copy()
+
+st.caption(
+    "Dua RM terhubung kalau portofolio nasabahnya beririsan di kombinasi industry × sub_industry × "
+    "region yang sama. Makin tebal & padat irisannya, makin besar potensi **concentration risk** "
+    "(eksposur kredit menumpuk di segmen yang sama) atau peluang **cross-referral** antar RM."
+)
+
+if len(net_nodes_f) < 2 or len(net_edges_f) == 0:
+    st.info("Tidak cukup RM pada filter ini untuk menampilkan graph jaringan (minimal 2 RM dengan irisan segmen).")
+else:
+    n_pairs_possible = len(net_nodes_f) * (len(net_nodes_f) - 1) / 2
+    density = len(net_edges_f) / n_pairs_possible if n_pairs_possible else 0
+    top_central = net_nodes_f.sort_values("value_centrality_credit", ascending=False).iloc[0]
+
+    nk1, nk2, nk3, nk4 = st.columns(4)
+    with nk1:
+        kpi_card("Jumlah Cluster", net_nodes_f["cluster_id"].nunique(), "🧩")
+    with nk2:
+        kpi_card("Densitas Graph", f"{density:.0%}", "🔗")
+    with nk3:
+        kpi_card("Avg Shared Segments", f"{net_edges_f['shared_segments'].mean():.0f}", "📐")
+    with nk4:
+        kpi_card("RM Paling Sentral", top_central["rm_label"], "⭐")
+    # Beri enter
+    st.markdown("<br>", unsafe_allow_html=True)
+    with st.container(border=True):
+        chart_title("Peta Jaringan RM (warna = cluster Louvain, ukuran = jumlah nasabah)")
+
+        edge_threshold = (
+            net_edges_f["total_approved_credit_shared"].quantile(0.75)
+            if len(net_edges_f) > 40 else net_edges_f["total_approved_credit_shared"].min()
+        )
+        edges_to_draw = net_edges_f[net_edges_f["total_approved_credit_shared"] >= edge_threshold]
+
+        pos_lookup = net_nodes.set_index("rm_id")[["pos_x", "pos_y"]].to_dict("index")
+
+        edge_x, edge_y = [], []
+        for _, r in edges_to_draw.iterrows():
+            p0, p1 = pos_lookup[r["rm_id_a"]], pos_lookup[r["rm_id_b"]]
+            edge_x += [p0["pos_x"], p1["pos_x"], None]
+            edge_y += [p0["pos_y"], p1["pos_y"], None]
+
+        fig_net = go.Figure()
+        fig_net.add_trace(go.Scatter(
+            x=edge_x, y=edge_y, mode="lines",
+            line=dict(width=1, color="rgba(156,163,175,0.45)"),
+            hoverinfo="none", showlegend=False,
+        ))
+
+        clusters = sorted(net_nodes_f["cluster_id"].unique())
+        for i, cid in enumerate(clusters):
+            sub = net_nodes_f[net_nodes_f["cluster_id"] == cid]
+            fig_net.add_trace(go.Scatter(
+                x=sub["pos_x"], y=sub["pos_y"], mode="markers",
+                marker=dict(
+                    size=(sub["n_nasabah"] / 3).clip(lower=8),
+                    color=WONDR_CATEGORICAL[i % len(WONDR_CATEGORICAL)],
+                    line=dict(width=1, color="white"),
+                ),
+                name=f"Cluster {cid}",
+                text=sub.apply(
+                    lambda r: (
+                        f"{r['rm_label']} ({r['region']})<br>"
+                        f"Nasabah: {r['n_nasabah']} · Approval: {r['approval_rate']:.0%}<br>"
+                        f"Avg Score: {r['avg_eligibility_score']:.2f}<br>"
+                        f"Approved Credit: {rupiah_short(r['total_approved_credit'])}"
+                    ), axis=1,
+                ),
+                hoverinfo="text",
+            ))
+
+        fig_net.update_layout(
+            height=520, margin=dict(l=10, r=10, t=10, b=10),
+            xaxis=dict(visible=False), yaxis=dict(visible=False),
+            font=dict(family="Inter, sans-serif"),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+            plot_bgcolor="white",
+        )
+        st.plotly_chart(fig_net, use_container_width=True)
+
+    name_lookup = net_nodes.set_index("rm_id")["rm_label"].to_dict()
+
+    p1, p2 = st.columns(2)
+    with p1:
+        with st.container(border=True):
+            chart_title("Top Pasangan RM — Concentration Risk")
+            top_pairs = net_edges_f.sort_values("total_approved_credit_shared", ascending=False).head(8).copy()
+            top_pairs["RM A"] = top_pairs["rm_id_a"].map(name_lookup)
+            top_pairs["RM B"] = top_pairs["rm_id_b"].map(name_lookup)
+            top_pairs["Kredit Bersama"] = top_pairs["total_approved_credit_shared"].map(rupiah_short)
+            top_pairs["Avg Score"] = top_pairs["avg_eligibility_score_shared"].map("{:.2f}".format)
+            st.dataframe(
+                top_pairs[["RM A", "RM B", "shared_segments", "Avg Score", "Kredit Bersama"]]
+                .rename(columns={"shared_segments": "Shared Segments"}),
+                use_container_width=True, hide_index=True, height=280,
+            )
+
+    with p2:
+        with st.container(border=True):
+            chart_title("Top RM — Value Centrality (Eksposur Jaringan)")
+            top_central_tbl = net_nodes_f.sort_values("value_centrality_credit", ascending=False).head(8).copy()
+            top_central_tbl["Value Centrality"] = top_central_tbl["value_centrality_credit"].map(rupiah_short)
+            st.dataframe(
+                top_central_tbl[["rm_label", "region", "Value Centrality", "jaccard_strength"]]
+                .rename(columns={
+                    "rm_label": "RM", "region": "Region", "jaccard_strength": "Jaccard Strength",
+                }),
+                use_container_width=True, hide_index=True, height=280,
+            )
 
 # ======================================================
 # DETAIL PER RM
