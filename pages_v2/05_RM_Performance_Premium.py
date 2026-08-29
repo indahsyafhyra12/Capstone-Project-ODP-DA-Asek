@@ -90,7 +90,7 @@ with c4:
 
 section_header("🏅", "RM Leaderboard")
 
-leaderboard = rm_stats.sort_values("approval_rate", ascending=False).copy()
+leaderboard = rm_stats.sort_values("total_nominal", ascending=False).copy()
 leaderboard.insert(0, "Rank", range(1, len(leaderboard) + 1))
 leaderboard_display = leaderboard[["Rank", "rm_name", "rm_branch_name", "total_nasabah", "approval_rate", "total_nominal"]].rename(columns={
     "rm_name": "RM", "rm_branch_name": "Cabang", "total_nasabah": "Nasabah", "approval_rate": "Approval Rate", "total_nominal": "Nominal"
