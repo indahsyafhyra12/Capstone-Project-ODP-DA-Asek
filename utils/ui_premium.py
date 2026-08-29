@@ -1,4 +1,10 @@
+from base64 import b64encode
+from pathlib import Path
+
 import streamlit as st
+
+LOGO_PATH = Path(__file__).parent.parent / "data" / "img" / "elo_bni_logo_crop.png"
+LOGO_DATA_URI = "data:image/png;base64," + b64encode(LOGO_PATH.read_bytes()).decode("ascii")
 
 # ==========================================================
 # WONDR COLOR PALETTE
@@ -402,7 +408,9 @@ def hero_banner(title, subtitle):
         '<div class="hero-banner">'
         '<div class="hero-banner-circle"></div>'
         '<div class="hero-banner-left">'
-        '<div class="hero-banner-icon">🏦</div>'
+        '<div class="hero-banner-icon">'
+        f'<img src="{LOGO_DATA_URI}" style="width:128px;height:128px;object-fit:contain;">'
+        '</div>'
         f'<div><div class="hero-banner-title">{title}</div>'
         f'<div class="hero-banner-subtitle">{subtitle}</div></div>'
         '</div>'

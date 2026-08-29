@@ -265,7 +265,10 @@ def _prefill_form_from_row(row: dict):
     st.session_state["_prefill_notice"] = row.get("company_name", "")
 
 
-tab_manual, tab_csv = st.tabs(["📝 Input Manual (1 Nasabah)", "📤 Upload CSV (1 atau Banyak Nasabah)"])
+if st.session_state.get("_open_manual_after_prefill"):
+    tab_csv, tab_manual = st.tabs(["📤 Upload CSV (1 atau Banyak Nasabah)", "📝 Input Manual (1 Nasabah)"])
+else:
+    tab_manual, tab_csv = st.tabs(["📝 Input Manual (1 Nasabah)", "📤 Upload CSV (1 atau Banyak Nasabah)"])
 
 # ---------------------------------------------------------------------------
 # TAB: Upload CSV
@@ -307,6 +310,7 @@ with tab_csv:
                     st.info("CSV berisi 1 pengajuan — form di tab **Input Manual** akan diisi otomatis untuk direview sebelum di-submit.")
                     if st.button("➡️ Isi ke Form Manual", type="primary"):
                         _prefill_form_from_row(upload_df.iloc[0].to_dict())
+                        st.session_state["_open_manual_after_prefill"] = True
                         st.rerun()
                 else:
                     st.info(f"CSV berisi {len(upload_df)} pengajuan — akan diproses langsung sebagai batch (tanpa form individual).")
@@ -376,7 +380,7 @@ with tab_csv:
 
         ecol1, ecol2, ecol3 = st.columns(3)
         with ecol1:
-            if st.button("💾 Simpan Perubahan Manual", type="primary", use_container_width=True):
+            if st.button("💾 Simpan Perubahan Manual", type="primary", use_container_width=True, key="save_batch_manual_changes"):
                 updated = list(st.session_state["_batch_results"])
                 for i, row in edited_df.iterrows():
                     orig = updated[i]
@@ -630,7 +634,7 @@ with tab_manual:
 
             bcol1, bcol2 = st.columns(2)
             with bcol1:
-                if st.button("💾 Simpan Perubahan Manual", type="primary", use_container_width=True):
+                if st.button("💾 Simpan Perubahan Manual", type="primary", use_container_width=True, key="save_single_manual_changes"):
                     if not result_row.get("_manual_override"):
                         result_row["_ai_original"] = {c: result_row[c] for c in MANUAL_EDIT_FIELDS}
                     proposed = {
