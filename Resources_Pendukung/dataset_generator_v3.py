@@ -27,6 +27,22 @@ industry), TIDAK menyentuh eligibility_score/label sama sekali:
     ADA & TIDAK diubah/dihapus (independen, by design pilihan user) -
     dashboard/graph disarankan pakai `rm_region` (dari join ke rm_master),
     bukan kolom `region` generik ini.
+    
+UPDATE v2 (dari v1):
+  - Tambah 3 kolom baru di retail_customer_profile: jenis_kredit_diajukan,
+    tenor_diajukan_bulan, tujuan_penggunaan_kredit (input pengajuan debitur,
+    saling konsisten satu sama lain & dgn loan_requested/industry)
+  - Fix DSR calculation: sebelumnya hardcode asumsi tenor 36 bulan & bunga
+    flat 12%, sekarang pakai tenor & bunga yang BENERAN diajukan debitur
+    (bunga beda per jenis kredit: KUR lebih rendah krn subsidi pemerintah)
+  - NOTE: perubahan DSR ini berdampak ke eligibility_score & label di setiap
+    baris (bukan random baru, tapi formula yang lebih akurat) - artinya
+    master_dataset.csv, master_scored.csv, dan ML model Layer 1 kamu perlu
+    di-regenerate/retrain ulang setelah pakai generator versi ini.
+  - Fungsi kategorikan_kelayakan() (4-level: Layak/Layak Bersyarat/Perlu
+    Review Ulang/Tidak Layak) disertakan di akhir file sebagai UTILITY
+    terpisah - dipakai nanti saat membangun master_scored.csv, BUKAN
+    bagian dari retail_customer_profile.csv.
 
 Cara pakai di Google Colab:
     1. Copy semua isi file ini ke satu cell

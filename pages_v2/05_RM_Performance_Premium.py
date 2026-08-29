@@ -240,6 +240,10 @@ else:
 
 section_header("👤", "Detail per RM")
 
+if rm_stats.empty:
+    st.warning("Tidak ada RM pada kombinasi filter ini. Ubah filter Region/Cabang/Jabatan di atas.")
+    st.stop()
+
 rm_stats["label"] = rm_stats["rm_id"] + " — " + rm_stats["rm_name"]
 selected_rm_label = st.selectbox("Pilih RM", rm_stats["label"])
 rm_row = rm_stats[rm_stats["label"] == selected_rm_label].iloc[0]
