@@ -59,7 +59,7 @@ div[data-testid="stNumberInput"]:has(input[aria-label="Nominal Pinjaman Diajukan
 """, unsafe_allow_html=True)
 
 hero_banner(
-    "📝 Pengajuan Kredit Baru",
+    "Pengajuan Kredit Baru",
     "Credit Eligibility AI • Screening UMKM menggunakan ML Pipeline (risk_ml_pipeline)."
 )
 

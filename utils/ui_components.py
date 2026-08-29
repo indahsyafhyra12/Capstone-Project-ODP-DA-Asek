@@ -26,6 +26,24 @@ AGENT_META = {
 def apply_logo():
     """Show the BNI logo at the top of the sidebar on every page."""
     st.logo(str(LOGO_PATH), size="large")
+    st.markdown(
+        """
+        <style>
+        section[data-testid="stSidebar"] header img,
+        section[data-testid="stSidebar"] [data-testid="stSidebarHeader"] img,
+        section[data-testid="stSidebar"] img[alt*="logo" i] {
+            width: 160px !important;
+            height: auto !important;
+            max-width: none !important;
+        }
+        section[data-testid="stSidebar"] header,
+        section[data-testid="stSidebar"] [data-testid="stSidebarHeader"] {
+            min-height: 86px !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def zone_color(zone: str) -> str:
