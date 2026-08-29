@@ -240,11 +240,14 @@ def _load_model():
     return processor, model
 
 
-def _run_generation(processor, model, user_prompt: str) -> str:
+def _run_generation(processor, model, user_prompt: str, system_prompt: str = SYSTEM_PROMPT) -> str:
+    """`system_prompt` defaults to this module's own SYSTEM_PROMPT (Final Decision
+    Narrative) - src/genai.py's Planner Summary reuses this same loader/generator
+    with its own system prompt instead of duplicating the generation code."""
     import torch
 
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt},
     ]
     inputs = processor.apply_chat_template(

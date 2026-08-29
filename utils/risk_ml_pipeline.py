@@ -226,12 +226,29 @@ def run_hard_rule_agents(row: dict) -> dict:
     }
 
 
-def predict_credit_screening(row_raw_features: dict) -> dict:
+def predict_credit_screening(
+    row_raw_features: dict,
+    precomputed_hard: dict | None = None,
+    precomputed_financial: dict | None = None,
+    precomputed_collateral: dict | None = None,
+    precomputed_cashflow: dict | None = None,
+) -> dict:
     """Run the 3-stage hybrid pipeline for one applicant.
 
     `row_raw_features` is a dict/Series exposing the raw columns from
     master_dataset.csv (NIK, owner_age, status_dhn, slik_*, revenue_*,
     collateral_*, bank_*, industry, loan_requested, ...).
+
+    The four `precomputed_*` kwargs let a caller that already ran
+    identity_agent/credit_history_agent/dhn_agent (`precomputed_hard`, same
+    shape as run_hard_rule_agents()'s return) and/or financial_agent/
+    collateral_agent/cashflow-scorer (`precomputed_financial`/
+    `precomputed_collateral`/`precomputed_cashflow`) pass those results in
+    instead of having this function recompute them - e.g.
+    src/orchestrator.py's Adaptive Verification Planner, which already ran
+    all of them while deciding routing. Every existing caller
+    (pages/3_Pengajuan_Credit_Baru.py, notebooks 04/05) omits these and gets
+    the exact same behavior as before.
 
     Returns the 7 policy fields (risk_score, decision, zone,
     jenis_kredit_rekomendasi, nominal_disetujui, jangka_waktu_bulan,
@@ -243,7 +260,7 @@ def predict_credit_screening(row_raw_features: dict) -> dict:
     # Reuses utils.agent_pipeline's agents instead of duplicating the checks -
     # verified to match Definisi A's hard-reject set exactly (220/220) on the
     # full training pool.
-    hard = run_hard_rule_agents(row)
+    hard = precomputed_hard if precomputed_hard is not None else run_hard_rule_agents(row)
 
     if hard["identity"]["hard_reject"]:
         reason = "; ".join(hard["identity"]["notes"]) or hard["identity"]["reject_reason"]
@@ -286,9 +303,13 @@ def predict_credit_screening(row_raw_features: dict) -> dict:
 
     # Sub-scores/notes purely for the insight narrative (NOT fed into the ML model)
     character = hard["credit_history"]
-    financial = financial_agent(row.get("revenue_growth_pct"), row.get("profit_margin_2025"))
-    collateral = collateral_agent(row.get("collateral_ratio"), row.get("ownership_match"))
-    cashflow = _calibrated_cashflow(row)
+    financial = precomputed_financial if precomputed_financial is not None else financial_agent(
+        row.get("revenue_growth_pct"), row.get("profit_margin_2025")
+    )
+    collateral = precomputed_collateral if precomputed_collateral is not None else collateral_agent(
+        row.get("collateral_ratio"), row.get("ownership_match")
+    )
+    cashflow = precomputed_cashflow if precomputed_cashflow is not None else _calibrated_cashflow(row)
     scores = {
         "Character": character["score"], "Financial": financial["score"],
         "Collateral": collateral["score"], "Cashflow": cashflow["score"],

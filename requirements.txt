@@ -4,7 +4,8 @@ plotly==6.9.0
 streamlit==1.51.0
 networkx==3.6.1
 scikit-learn==1.9.0
-xgboost==3.4.1
+xgboost>=3.0,<4
 joblib==1.5.3
 bitsandbytes>=0.46.1
 matplotlib>=3.9
+pytest>=8.0
