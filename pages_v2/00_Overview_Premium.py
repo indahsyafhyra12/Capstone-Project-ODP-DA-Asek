@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
+from utils.data_loader import load_industry_cluster_network
 from utils.ui_components import apply_logo
 from utils.ui_premium import hero_banner, kpi_card, section_header, chart_title, rupiah_short, inject_css, WONDR_COLORS, ZONE_COLORS
 
@@ -487,6 +488,102 @@ if not ind.empty:
         f"**{top_ind.industry}** memiliki rata-rata Credit Eligibility tertinggi "
         f"({top_ind.Eligibility:.2f}) dengan **{top_ind.Applications:,}** pengajuan."
     )
+
+# ------------------------------------------------------
+# Cluster Risiko Lintas-Segmen (Graph Analytics)
+# hasil notebooks/graph_analytics_industry_part 2.ipynb, diekspor ke
+# data/processed/industry_cluster_nodes.csv & industry_cluster_edges.csv.
+# Nasabah di-cluster (Louvain) bukan cuma berdasarkan sub_industry|region
+# yang sama persis, tapi juga kemiripan risk_score lintas segmen — jadi
+# 1 cluster bisa memotong batas industri. Ini analisis atas SELURUH
+# portofolio (tidak ikut filter Cabang/Industri/Sub-Industry di atas),
+# karena cluster-nya dihitung dari komposisi lintas-segmen.
+# ------------------------------------------------------
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+with st.container(border=True):
+    chart_title("🕸️ Cluster Risiko Lintas-Segmen (Graph Analytics)")
+    st.caption(
+        "Nasabah dikelompokkan berdasarkan kombinasi segmen (sub-industry × region) **dan** kemiripan "
+        "risk_score, sehingga satu cluster bisa berisi lebih dari satu industri kalau profil risikonya "
+        "menyatu. Analisis ini mencakup seluruh portofolio (tidak mengikuti filter di atas)."
+    )
+
+    ic_nodes, ic_edges = load_industry_cluster_network()
+
+    ic1, ic2, ic3, ic4 = st.columns(4)
+    with ic1:
+        kpi_card("Jumlah Cluster", ic_nodes["cluster_id"].nunique(), "🧩")
+    with ic2:
+        kpi_card("Cluster Risiko Tinggi", int((ic_nodes["low_score_share"] >= 0.5).sum()), "🚨")
+    with ic3:
+        kpi_card("Avg Nasabah/Cluster", f"{ic_nodes['n_nasabah'].mean():.0f}", "👥")
+    with ic4:
+        kpi_card("Pasangan Cluster Terhubung", len(ic_edges), "🔗")
+
+    g1, g2 = st.columns([1.4, 1])
+
+    with g1:
+        edges_to_draw = ic_edges.nlargest(60, "weight")
+        pos_lookup = ic_nodes.set_index("cluster_id")[["pos_x", "pos_y"]].to_dict("index")
+
+        edge_x, edge_y = [], []
+        for _, r in edges_to_draw.iterrows():
+            p0, p1 = pos_lookup[r["cluster_a"]], pos_lookup[r["cluster_b"]]
+            edge_x += [p0["pos_x"], p1["pos_x"], None]
+            edge_y += [p0["pos_y"], p1["pos_y"], None]
+
+        fig_ic = go.Figure()
+        fig_ic.add_trace(go.Scatter(
+            x=edge_x, y=edge_y, mode="lines",
+            line=dict(width=1, color="rgba(156,163,175,0.45)"),
+            hoverinfo="none", showlegend=False,
+        ))
+        fig_ic.add_trace(go.Scatter(
+            x=ic_nodes["pos_x"], y=ic_nodes["pos_y"], mode="markers",
+            marker=dict(
+                size=(ic_nodes["n_nasabah"] / 3).clip(lower=10),
+                color=ic_nodes["avg_score"], colorscale="RdYlGn", cmin=0, cmax=1,
+                showscale=True, colorbar=dict(title="Avg Score"),
+                line=dict(width=1, color="white"),
+            ),
+            text=ic_nodes.apply(
+                lambda r: (
+                    f"Cluster {r['cluster_id']}<br>{r['top_segments']}<br>"
+                    f"Nasabah: {r['n_nasabah']} · Avg Score: {r['avg_score']:.2f}<br>"
+                    f"Risiko Rendah: {r['low_score_share']:.0%}"
+                ), axis=1,
+            ),
+            hoverinfo="text", showlegend=False,
+        ))
+        fig_ic.update_layout(
+            height=420, margin=dict(l=10, r=10, t=10, b=10),
+            xaxis=dict(visible=False), yaxis=dict(visible=False),
+            font=dict(family="Inter, sans-serif"), plot_bgcolor="white",
+        )
+        st.plotly_chart(fig_ic, use_container_width=True)
+
+    with g2:
+        chart_title("Cluster Risiko Tertinggi")
+        top_risk_ic = ic_nodes.sort_values("low_score_share", ascending=False).head(5).copy()
+        top_risk_ic["Risiko Rendah"] = top_risk_ic["low_score_share"].map("{:.0%}".format)
+        top_risk_ic["Avg Score"] = top_risk_ic["avg_score"].map("{:.2f}".format)
+        st.dataframe(
+            top_risk_ic[["cluster_id", "top_segments", "n_nasabah", "Avg Score", "Risiko Rendah"]]
+            .rename(columns={"cluster_id": "Cluster", "top_segments": "Segmen Dominan", "n_nasabah": "Nasabah"}),
+            use_container_width=True, hide_index=True, height=230,
+        )
+
+        chart_title("Pasangan Cluster Paling Erat Terhubung")
+        seg_lookup = ic_nodes.set_index("cluster_id")["top_segments"].to_dict()
+        top_pairs_ic = ic_edges.nlargest(5, "weight").copy()
+        top_pairs_ic["Cluster A"] = top_pairs_ic["cluster_a"].map(lambda c: f"{c} — {seg_lookup.get(c, '')}")
+        top_pairs_ic["Cluster B"] = top_pairs_ic["cluster_b"].map(lambda c: f"{c} — {seg_lookup.get(c, '')}")
+        st.dataframe(
+            top_pairs_ic[["Cluster A", "Cluster B", "weight"]].rename(columns={"weight": "Kedekatan"}),
+            use_container_width=True, hide_index=True, height=230,
+        )
 
 # ======================================================
 # BRANCH INTELLIGENCE

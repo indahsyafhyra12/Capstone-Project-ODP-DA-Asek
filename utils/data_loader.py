@@ -10,6 +10,8 @@ from utils.agent_pipeline import score_dataframe
 DATA_PATH = Path(__file__).parent.parent / "data" / "processed" / "master_dataset.csv"
 NETWORK_NODES_PATH = Path(__file__).parent.parent / "data" / "processed" / "rm_network_nodes.csv"
 NETWORK_EDGES_PATH = Path(__file__).parent.parent / "data" / "processed" / "rm_network_edges.csv"
+INDUSTRY_CLUSTER_NODES_PATH = Path(__file__).parent.parent / "data" / "processed" / "industry_cluster_nodes.csv"
+INDUSTRY_CLUSTER_EDGES_PATH = Path(__file__).parent.parent / "data" / "processed" / "industry_cluster_edges.csv"
 
 
 @st.cache_data
@@ -37,6 +39,26 @@ def load_rm_network():
 
     nodes["pos_x"] = nodes["rm_id"].map(lambda n: pos[n][0])
     nodes["pos_y"] = nodes["rm_id"].map(lambda n: pos[n][1])
+    return nodes, edges
+
+
+@st.cache_data
+def load_industry_cluster_network():
+    """Load node & edge table hasil graph analytics industri
+    (notebooks/graph_analytics_industry_part 2.ipynb — clustering nasabah lintas
+    sub_industry/region berbasis kemiripan risk_score) dan hitung posisi layout
+    (spring layout, sama seperti Tahap 6 notebook)."""
+    nodes = pd.read_csv(INDUSTRY_CLUSTER_NODES_PATH)
+    edges = pd.read_csv(INDUSTRY_CLUSTER_EDGES_PATH)
+
+    G = nx.Graph()
+    G.add_nodes_from(nodes["cluster_id"])
+    for _, r in edges.iterrows():
+        G.add_edge(r["cluster_a"], r["cluster_b"], weight=r["weight"])
+    pos = nx.spring_layout(G, seed=42, k=1.2, weight="weight")
+
+    nodes["pos_x"] = nodes["cluster_id"].map(lambda n: pos[n][0])
+    nodes["pos_y"] = nodes["cluster_id"].map(lambda n: pos[n][1])
     return nodes, edges
 
 
