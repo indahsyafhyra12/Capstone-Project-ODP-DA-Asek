@@ -650,10 +650,10 @@ with b2:
             )
 
 # ======================================================
-# AI EXECUTIVE INSIGHT
+# Insight Portofolio
 # ======================================================
 
-section_header("🤖", "AI Executive Insight")
+section_header("📌", "Insight Portofolio")
 
 top_credit = filtered["jenis_kredit_diajukan"].mode()[0] if not filtered.empty else "-"
 top_industry = ind.sort_values("Eligibility", ascending=False).iloc[0]["industry"] if not ind.empty else "-"
