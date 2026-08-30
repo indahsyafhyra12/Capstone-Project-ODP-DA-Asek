@@ -355,11 +355,7 @@ with n4:
 
 section_header("🌍", "Geographic Insights")
 
-# PENTING: branch_coords ini isinya nama KOTA, jadi lookup-nya harus
-# pakai kolom `city`, bukan `branch_name`. Versi sebelumnya nge-lookup
-# pakai branch_name (isinya "KCP Cibubur" dst) yang ga match sama
-# sekali ke dictionary ini — hasilnya semua baris ke-drop dan peta
-# kosong.
+# Koordinat berdasarkan kota (bukan branch_name)
 branch_coords = {
     "Jakarta Pusat": (-6.175, 106.827),
     "Jakarta Selatan": (-6.261, 106.811),
@@ -373,32 +369,79 @@ branch_coords = {
     "Tangerang Selatan": (-6.286, 106.718),
 }
 
+# Ringkasan per KCP (branch_name + region), bukan lagi per kota —
+# supaya "persebaran KCP" beneran keliatan per cabang, bukan cuma
+# per kota. Tetap butuh kolom city buat nentuin titik pusat koordinat.
 geo = (
     filtered.assign(nominal_disetujui=filtered["nominal_disetujui"].fillna(0))
-    .groupby("city", as_index=False)
+    .groupby(["branch_name", "region", "city"], as_index=False)
     .agg(
         total_pengajuan=("application_id", "count"),
-        avg_eligibility=("credit_eligibility", "mean"),
+        total_nominal=("nominal_disetujui", "sum"),
+        avg_nominal=("nominal_disetujui", "mean"),
     )
 )
+geo["label"] = geo["branch_name"] + " (" + geo["region"] + ")"
 
-geo["lat"] = geo["city"].map(lambda x: branch_coords.get(x, (None, None))[0])
-geo["lon"] = geo["city"].map(lambda x: branch_coords.get(x, (None, None))[1])
-geo["nominal_disetujui_short"] = geo["nominal_disetujui"].map(rupiah_short)
-geo = geo.dropna(subset=["lat", "lon"])
+# Koordinat pusat kota
+geo["lat_city"] = geo["city"].map(lambda x: branch_coords.get(x, (None, None))[0])
+geo["lon_city"] = geo["city"].map(lambda x: branch_coords.get(x, (None, None))[1])
+geo = geo.dropna(subset=["lat_city", "lon_city"])
+
+# Kita nggak punya koordinat asli per KCP — jadi tiap KCP dalam kota
+# yang sama digeser sedikit (jitter) di sekitar titik pusat kotanya,
+# biar nggak numpuk jadi satu titik. Ini POSISI VISUAL, bukan lokasi
+# KCP yang sebenarnya. seed tetap (per-branch_name) biar posisinya
+# konsisten tiap kali app di-refresh, bukan acak ulang tiap run.
+import numpy as np
+
+def jitter(row, scale=0.02):
+    rng = np.random.default_rng(abs(hash(row["branch_name"])) % (2**32))
+    return pd.Series({
+        "lat": row["lat_city"] + rng.uniform(-scale, scale),
+        "lon": row["lon_city"] + rng.uniform(-scale, scale),
+    })
+
+geo[["lat", "lon"]] = geo.apply(jitter, axis=1)
+
+# Format rupiah untuk hover
+geo["total_nominal_short"] = geo["total_nominal"].map(rupiah_short)
+geo["avg_nominal_short"] = geo["avg_nominal"].map(rupiah_short)
 
 with st.container(border=True):
     if geo.empty:
         st.info("Tidak ada data lokasi untuk filter saat ini.")
     else:
-        fig = px.scatter_mapbox(
-            geo, lat="lat", lon="lon",
-            size="total_pengajuan", color="avg_eligibility",
-            hover_name="city",
-            hover_data={"total_pengajuan": True, "avg_eligibility": ":.2f", "lat": False, "lon": False},
-            color_continuous_scale="RdYlGn", zoom=8, height=480,
+        st.caption(
+            "Posisi tiap titik KCP digeser sedikit dari titik pusat kotanya untuk "
+            "keterbacaan (bukan koordinat KCP yang sebenarnya)."
         )
-        fig.update_layout(mapbox_style="open-street-map", margin=dict(l=0, r=0, t=0, b=0))
+        fig = px.scatter_map(
+            geo,
+            lat="lat",
+            lon="lon",
+            size="total_nominal",
+            color="avg_nominal",
+            hover_name="label",
+            hover_data={
+                "region": True,
+                "total_pengajuan": True,
+                "total_nominal_short": True,
+                "avg_nominal_short": True,
+                "lat": False,
+                "lon": False,
+            },
+            color_continuous_scale="RdYlGn",
+            zoom=8,
+            height=480,
+        )
+
+        fig.update_layout(
+            map_style="open-street-map",
+            margin=dict(l=0, r=0, t=0, b=0),
+            coloraxis_colorbar_title="Avg Nominal",
+        )
+
         st.plotly_chart(fig, use_container_width=True)
 
 # ======================================================
