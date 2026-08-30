@@ -206,7 +206,7 @@ if credit_type_check["jenis_kredit_sesuai"] is not None:
         tenor_diajukan = pick("tenor_diajukan_bulan", default=None)
         q2.metric("Tenor Diajukan", f"{tenor_diajukan} bulan" if tenor_diajukan else "-")
         q3.metric("Jenis Direkomendasikan", credit_type_check["jenis_kredit_rekomendasi"])
-        q4.metric("DSR Pengajuan", f"{dsr:.2f}%" if dsr is not None else "-")
+        q4.metric("DSR Pengajuan", f"{dsr*100:.0f}%" if dsr is not None else "-")
 
         st.markdown(
             f'<span style="background:{sesuai_color}22;color:{sesuai_color};border:1px solid {sesuai_color};'

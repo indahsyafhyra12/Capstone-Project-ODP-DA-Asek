@@ -832,7 +832,7 @@ with tab_manual:
                 q2.metric("Tenor Diajukan", f"{tenor_d} bulan" if tenor_d else "-")
                 q3.metric("Jenis Direkomendasikan", result_row["Jenis Kredit"])
                 dsr = result_row.get("_dsr_pada_pengajuan")
-                q4.metric("DSR Pengajuan", f"{dsr:.2f}%" if dsr is not None else "-")
+                q4.metric("DSR Pengajuan", f"{dsr*100:.0f}%" if dsr is not None else "-")
                 st.markdown(
                     f'<span style="background:{sesuai_color}22;color:{sesuai_color};border:1px solid {sesuai_color};'
                     f'padding:3px 10px;border-radius:99px;font-size:12px;font-weight:600;">'
