@@ -166,6 +166,35 @@ for i, (icon, name, v, note) in enumerate(agents):
                     st.caption(note)
 
 # ==========================================================
+# DATA AGUNAN / COLLATERAL
+# ==========================================================
+
+section_header("🏠", "Data Agunan / Collateral")
+
+collateral_market_value = float(pick("collateral_market_value", default=0) or 0)
+collateral_liquidation_value = float(pick("collateral_liquidation_value", default=0) or 0)
+collateral_size_m2 = pick("collateral_size_m2", default=None)
+collateral_ratio = pick("collateral_ratio", default=None)
+collateral_location = pick("collateral_location", default="-")
+collateral_province = pick("collateral_province", default="")
+
+with st.container(border=True):
+    g1, g2, g3, g4 = st.columns(4)
+    g1.metric("Jenis Agunan", pick("collateral_type", default="-"))
+    g2.metric("Jenis Sertifikat", pick("certificate_type", default="-"))
+    g3.metric("Luas Agunan", f"{float(collateral_size_m2):.1f} m²" if isinstance(collateral_size_m2, (int, float)) else "-")
+    g4.metric("Kesesuaian Kepemilikan", pick("ownership_match", default="-"))
+
+    st.markdown('<div style="border-top:0.5px solid #E5E7EB;margin:12px 0;"></div>', unsafe_allow_html=True)
+
+    h1, h2, h3, h4 = st.columns(4)
+    h1.metric("Nilai Pasar Agunan", rupiah_short(collateral_market_value))
+    h2.metric("Nilai Likuidasi", rupiah_short(collateral_liquidation_value))
+    h3.metric("Rasio Agunan/Pinjaman", f"{float(collateral_ratio)*100:.0f}%" if isinstance(collateral_ratio, (int, float)) else "-")
+    lokasi = ", ".join([x for x in [collateral_location, collateral_province] if x and x != "-"]) or "-"
+    h4.metric("Lokasi Agunan", lokasi)
+
+# ==========================================================
 # FINANCIAL SNAPSHOT
 # ==========================================================
 

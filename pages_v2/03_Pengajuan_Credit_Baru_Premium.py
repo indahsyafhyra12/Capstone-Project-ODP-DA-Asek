@@ -849,14 +849,14 @@ with tab_manual:
 
         st.markdown('<div class="section-title">🗣️ Narasi (LLM)</div>', unsafe_allow_html=True)
         if result_row.get("Alasan"):
-            if result_row.get("_planner_summary"):
-                st.info(f"🧭 **Proses Verifikasi (Planner Summary):** {result_row['_planner_summary']}")
-            st.write(result_row["Alasan"])
+            st.info(f"🗣️ **Alasan**: {result_row["Alasan"]}")
             if result_row.get("_fallback_reason"):
                 st.warning(
                     f"⚠️ Narasi di atas adalah **fallback** ke insight rule-based — narasi LLM (Gemma) "
                     f"gagal dihasilkan. Alasan teknis: `{result_row['_fallback_reason']}`"
                 )
+            if result_row.get("_planner_summary"):
+                st.write(f"🧭 **Proses Verifikasi (Planner Summary):** {result_row['_planner_summary']}")
         else:
             st.caption("Belum digenerate — klik tombol di bawah kalau perlu narasi natural untuk laporan (opsional, Credit Eligibility Score di atas sudah final).")
             if st.button("🤖 Generate Narasi (LLM)"):
