@@ -31,11 +31,12 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+from src import genai
+from src.orchestrator import run_screening
 from utils.agent_pipeline import _dukcapil_names, _normalize_name
 from utils.feature_builder import build_features_from_raw, load_raw_tables
 from utils.kwitansi_extractor import build_raw_text_export, compute_monthly_estimates, extract_zip_bytes
-from utils.report_agent import generate_report, get_last_fallback_reason
-from utils.risk_ml_pipeline import apply_policy_engine, predict_credit_screening
+from utils.risk_ml_pipeline import apply_policy_engine
 from utils.ui_components import apply_logo
 from utils.ui_premium import inject_css, hero_banner
 
@@ -186,11 +187,16 @@ def _build_csv_template() -> bytes:
 
 
 def run_ml_screening(user_fields: dict, application_id: str) -> dict:
-    """Bagian CEPAT (ML only) - system-fill field non-user, build fitur dari
-    raw tables, jalankan predict_credit_screening(). TIDAK memanggil LLM,
-    jadi risk_score/decision bisa langsung dilihat tanpa menunggu narasi.
-    Narasi "Alasan" diisi lewat run_llm_narrative() secara terpisah, dipicu
-    tombol lain."""
+    """Bagian CEPAT (Planner + ML, tanpa LLM) - system-fill field non-user,
+    build fitur dari raw tables, jalankan src.orchestrator.run_screening()
+    dengan explain_with_gemma=False. Itu menjalankan Adaptive Verification
+    Planner (src/agents/planner_agent.py) lalu ML risk_score + Policy Engine
+    yang sama seperti sebelumnya (utils.risk_ml_pipeline.predict_credit_screening()),
+    tapi TIDAK memanggil Gemma, jadi risk_score/decision bisa langsung dilihat
+    tanpa menunggu narasi. PlannerTrace-nya disimpan (kunci "_planner_trace")
+    supaya run_llm_narrative() bisa memakainya utk Planner Summary tanpa
+    menjalankan ulang planner-nya. Narasi "Alasan" diisi lewat
+    run_llm_narrative() secara terpisah, dipicu tombol lain."""
     nik = str(user_fields["NIK"]).strip()
     existing_cif = profile_full.loc[profile_full["NIK"] == nik, "cif_number"]
     cif_number = existing_cif.iloc[0] if len(existing_cif) else f"CIF-SIM-{nik[-6:] if len(nik) >= 6 else nik}"
@@ -217,7 +223,10 @@ def run_ml_screening(user_fields: dict, application_id: str) -> dict:
     new_profile_row = pd.DataFrame([new_row])[profile_full.columns.tolist()]
 
     features = build_features_from_raw([application_id], new_profile_row, slik_full, dhn_full, bank_full, fin_full)
-    result = predict_credit_screening(features.iloc[0].to_dict())
+    screening = run_screening(features.iloc[0].to_dict(), explain_with_gemma=False)
+    result = screening.to_dict()
+    planner_trace = result.pop("planner_trace")
+    result.pop("gemma_explanation", None)
 
     company_name = user_fields.get("company_name", "")
     return {
@@ -232,11 +241,13 @@ def run_ml_screening(user_fields: dict, application_id: str) -> dict:
         "Jangka Waktu (bulan)": result["jangka_waktu_bulan"],
         "Bunga (% p.a.)": result["bunga_persen"],
         "Alasan": None,
+        "_planner_summary": None,
         "_fallback_reason": None,
         "_insight": result["insight"],
         "_shap": result["shap_top_factors"],
         "_is_existing_nik": nik in KNOWN_NIKS,
         "_result": result,
+        "_planner_trace": planner_trace,
         "_manual_override": False,
         "_loan_requested": loan_requested,
         "_collateral_market_value": collateral_market_value,
@@ -249,13 +260,19 @@ def run_ml_screening(user_fields: dict, application_id: str) -> dict:
 
 
 def run_llm_narrative(row: dict) -> dict:
-    """Bagian LAMBAT (LLM) - isi kolom "Alasan" dari row hasil
-    run_ml_screening() (butuh key "_result" mentah dari predict_credit_screening).
-    Dipanggil terpisah lewat tombol sendiri supaya risk_score bisa dilihat
-    duluan tanpa menunggu ini."""
+    """Bagian LAMBAT (LLM) - isi kolom "Alasan" + "_planner_summary" dari row
+    hasil run_ml_screening() lewat src.genai.explain(), yaitu Gemma Explanation
+    Layer yang menghasilkan DUA narasi dari trace/hasil yang SAMA dengan yang
+    sudah dilihat di layar (PlannerTrace dari "_planner_trace" + ml_result dari
+    "_result"): Planner Summary (proses verifikasi) dan Final Decision
+    Narrative (hasil akhir, via utils.report_agent.generate_report() seperti
+    sebelumnya). Dipanggil terpisah lewat tombol sendiri supaya risk_score
+    bisa dilihat duluan tanpa menunggu LLM."""
     row = dict(row)
-    row["Alasan"] = generate_report({"company_name": row["company_name"], **row["_result"]})
-    row["_fallback_reason"] = get_last_fallback_reason()
+    explanation = genai.explain(row["_planner_trace"], row["_result"], {"company_name": row["company_name"]})
+    row["Alasan"] = explanation.final_decision_narrative
+    row["_planner_summary"] = explanation.planner_summary
+    row["_fallback_reason"] = explanation.fallback_reason
     return row
 
 
@@ -475,6 +492,8 @@ with tab_csv:
         with st.expander("AI Insight per Nasabah"):
             for r in st.session_state["_batch_results"]:
                 st.markdown(f"**{r['application_id']} — {r['company_name']}**: {r.get('Alasan') or r['_insight']}")
+                if r.get("_planner_summary"):
+                    st.caption(f"🧭 Proses verifikasi (Planner): {r['_planner_summary']}")
                 if r.get("_fallback_reason"):
                     st.caption(f"⚠️ Fallback: {r['_fallback_reason']}")
 
@@ -830,6 +849,8 @@ with tab_manual:
 
         st.markdown('<div class="section-title">🗣️ Narasi (LLM)</div>', unsafe_allow_html=True)
         if result_row.get("Alasan"):
+            if result_row.get("_planner_summary"):
+                st.info(f"🧭 **Proses Verifikasi (Planner Summary):** {result_row['_planner_summary']}")
             st.write(result_row["Alasan"])
             if result_row.get("_fallback_reason"):
                 st.warning(
