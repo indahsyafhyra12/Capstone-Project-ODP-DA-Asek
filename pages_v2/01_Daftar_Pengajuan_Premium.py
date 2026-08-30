@@ -108,6 +108,7 @@ with d:
     kpi_card("Avg Eligibility", f"{filtered.risk_score.mean():.2f}", "🟢")
 
 # ---------- QUICK INSIGHT ----------
+st.markdown("<br>", unsafe_allow_html=True)
 section_header("💡", "Queue Snapshot")
 
 i1, i2, i3 = st.columns(3)

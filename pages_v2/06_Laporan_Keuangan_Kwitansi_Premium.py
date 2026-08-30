@@ -27,7 +27,7 @@ inject_css()
 
 hero_banner(
     "Generate Laporan Keuangan",
-    "Ekstraksi omset & profit otomatis dari kwitansi menggunakan OCR lokal (LightOnOCR-2-1B)."
+    "Ekstraksi omset & profit otomatis dari kwitansi."
 )
 
 # ======================================================

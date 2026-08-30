@@ -179,7 +179,7 @@ with c5:
 # ======================================================
 # RINGKASAN HASIL SCREENING
 # ======================================================
-
+st.markdown("<br>", unsafe_allow_html=True)
 section_header("✅", "Ringkasan Hasil Screening")
 
 s1, s2, s3 = st.columns([1.2, 1, 1])

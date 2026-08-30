@@ -88,6 +88,8 @@ with c4:
 # RM LEADERBOARD
 # ======================================================
 
+st.markdown("<br>", unsafe_allow_html=True) # unsafe_allow_html=True agar html bisa diparse, bukan ditampilkan mentah. Kalau False, <br> akan muncul di layar.
+
 section_header("🏅", "RM Leaderboard")
 
 leaderboard = rm_stats.sort_values("total_nominal", ascending=False).copy()
