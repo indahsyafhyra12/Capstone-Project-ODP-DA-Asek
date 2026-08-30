@@ -440,7 +440,7 @@ Semua proses riset & training ada di [notebooks/](notebooks/) (butuh
 - [x] Graph analytics (jaringan RM & klaster industri)
 - [x] Unit test (`tests/`)
 - [x] Deploy live demo (Streamlit Community Cloud)
-- [] Full Publish for BNI (Coming Soon ...)
+- [ ] Full Publish for BNI (Coming Soon ...)
 
 ## Tim
 
