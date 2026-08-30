@@ -374,11 +374,11 @@ branch_coords = {
 }
 
 geo = (
-    filtered.groupby("city", as_index=False)
+    filtered.assign(nominal_disetujui=filtered["nominal_disetujui"].fillna(0))
+    .groupby("city", as_index=False)
     .agg(
         total_pengajuan=("application_id", "count"),
         avg_eligibility=("credit_eligibility", "mean"),
-        nominal_disetujui=("nominal_disetujui", "sum"),
     )
 )
 
@@ -393,15 +393,9 @@ with st.container(border=True):
     else:
         fig = px.scatter_mapbox(
             geo, lat="lat", lon="lon",
-            size="total_pengajuan", color="nominal_disetujui",
+            size="total_pengajuan", color="avg_eligibility",
             hover_name="city",
-            hover_data={
-                "nominal_disetujui": False,
-                "nominal_disetujui_short": True,
-                "avg_eligibility": ":.2f",
-                "lat": False,
-                "lon": False,
-            },
+            hover_data={"total_pengajuan": True, "avg_eligibility": ":.2f", "lat": False, "lon": False},
             color_continuous_scale="RdYlGn", zoom=8, height=480,
         )
         fig.update_layout(mapbox_style="open-street-map", margin=dict(l=0, r=0, t=0, b=0))
