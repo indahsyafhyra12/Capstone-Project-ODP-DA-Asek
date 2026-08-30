@@ -378,11 +378,13 @@ geo = (
     .agg(
         total_pengajuan=("application_id", "count"),
         avg_eligibility=("credit_eligibility", "mean"),
+        nominal_disetujui=("nominal_disetujui", "sum"),
     )
 )
 
 geo["lat"] = geo["city"].map(lambda x: branch_coords.get(x, (None, None))[0])
 geo["lon"] = geo["city"].map(lambda x: branch_coords.get(x, (None, None))[1])
+geo["nominal_disetujui_short"] = geo["nominal_disetujui"].map(rupiah_short)
 geo = geo.dropna(subset=["lat", "lon"])
 
 with st.container(border=True):
@@ -391,9 +393,15 @@ with st.container(border=True):
     else:
         fig = px.scatter_mapbox(
             geo, lat="lat", lon="lon",
-            size="total_pengajuan", color="avg_eligibility",
+            size="total_pengajuan", color="nominal_disetujui",
             hover_name="city",
-            hover_data={"total_pengajuan": True, "avg_eligibility": ":.2f", "lat": False, "lon": False},
+            hover_data={
+                "nominal_disetujui": False,
+                "nominal_disetujui_short": True,
+                "avg_eligibility": ":.2f",
+                "lat": False,
+                "lon": False,
+            },
             color_continuous_scale="RdYlGn", zoom=8, height=480,
         )
         fig.update_layout(mapbox_style="open-street-map", margin=dict(l=0, r=0, t=0, b=0))
